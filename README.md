@@ -16,7 +16,7 @@ Each member has a clearly owned **individual technical module/subsystem**, while
 
 **Integration is a team task.** Jason acts as the **integration lead/coordinator**, meaning he maintains the integration branch, coordinates interface compatibility, runs whole-system regressions and leads final board bring-up. This does **not** make integration solely Jason's task: each subsystem owner must integrate, debug and fix their own module when connected to the full design.
 
-If an agreed module milestone is missed, or a submitted module does not meet the previously agreed interface/test/quality requirements in time for integration, the integration lead may take over the minimum work necessary to keep the project on schedule. Any takeover should be documented in the contribution/decision log with the original owner, agreed deadline, issue found, and work completed.
+If an agreed module milestone is missed, or a submitted module does not meet the previously agreed interface/test/quality requirements in time for integration, the integration lead and other group members may take over the minimum work necessary to keep the project on schedule. Any takeover should be documented in the contribution/decision log with the original owner, agreed deadline, issue found, and work completed.
 
 > **Note:** Mini-Project 2 has not yet been released. Filenames marked **[PROVISIONAL]** reflect the expected architecture from the Assignment 2 brief and Lessons 3–4. When the official scaffold is released, keep the official module/port names and update this README.
 
