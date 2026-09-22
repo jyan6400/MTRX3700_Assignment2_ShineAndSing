@@ -355,6 +355,47 @@ The exact day and time are **pending and negotiable** and will be agreed by the 
 
 If a common in-person time cannot be arranged, integration will instead be completed remotely using Git, shared Verilator testbenches, simulation results and group chat. Since the physical DE1-SoC board is held by Jason, Jason will perform any board programming and physical hardware checks required during remote integration, while Luke and Advay remain responsible for debugging and updating their respective audio and video subsystems.
 
+## FPGA Board Access and Validation
+
+Writing and testing RTL modules does **not** require continuous access to the physical DE1-SoC board. Individual module development and most functional validation should be completed using simulation, self-checking testbenches, Verilator and waveform inspection before hardware testing.
+
+The DE1-SoC board will be kept by Jason so that there is one consistent hardware setup for final integration and to avoid the board being passed between locations unnecessarily.
+
+If Luke or Advay want to perform physical validation or hardware debugging of their subsystem, they can organise a suitable time to meet at university with Jason. Jason will bring the board for that session so the subsystem owner can test and debug their own work directly on hardware.
+
+Physical board access should therefore be treated as an **additional validation step**, not as a prerequisite for completing assigned module code or simulation-based verification.
+
+During remote integration, Jason can perform board programming and physical checks and report the observed behaviour back to the relevant subsystem owner. The owner remains responsible for fixing RTL or interface issues within their own subsystem.
+
+## Deadlines, Review and Task Ownership
+
+The project schedule has been deliberately organised so that work is completed **before the final integration deadline**, leaving sufficient time for other group members to review, test and provide feedback on each subsystem.
+
+Each member should therefore aim to complete their assigned work by the agreed milestone rather than treating the milestone as the point at which development begins.
+
+When a module or report contribution is submitted for review:
+
+1. Other group members may review the work against the agreed interface, functional requirements, test requirements and assignment marking criteria.
+2. If requirements are missing, tests are insufficient, integration assumptions are incorrect, or the work does not yet meet the agreed standard, constructive feedback will be provided.
+3. The original owner should then revise the work and submit an updated version within the agreed recovery timeframe.
+4. Review comments are intended as quality assurance and do not automatically transfer ownership of the task.
+
+If an agreed deadline is missed:
+
+1. The group may send a reminder or **bump** requesting a progress update.
+2. If there is no response, a second reminder may be sent within a reasonable period.
+3. If approximately **1–2 reminders receive no meaningful response**, the previously agreed deadline has already been missed, and the delay is blocking dependent work or integration, another group member may take over the minimum work required to keep the project on schedule.
+4. Any takeover should be documented in the contribution and decision logs, including:
+   - original task owner;
+   - original agreed deadline;
+   - reminders sent;
+   - latest available status/commit;
+   - reason the task was blocking progress;
+   - work completed by the replacement member;
+   - final relevant commit(s).
+
+Task takeover is a **contingency for protecting the project schedule**, not the default workflow. The preferred outcome is always that each member completes, revises and integrates their own assigned technical work.
+
 ## Schedule-protection / takeover rule
 
 To manage the risk of late or sub-standard subsystem delivery:
