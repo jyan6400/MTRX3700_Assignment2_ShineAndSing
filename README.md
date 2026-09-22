@@ -345,6 +345,16 @@ Integration is explicitly a **group task**, not a fourth subsystem assigned to o
 - fixes Avalon-ST, boundary, mask or VGA issues found during system testing;
 - remains available during board bring-up for display/video debugging.
 
+## Proposed In-Person Integration Session
+
+The group will aim to organise **one in-person integration session at university during the week beginning 28 September 2026**, subject to the availability of all three members.
+
+The purpose of this session will be to combine the audio, game/control and video subsystems, resolve interface and clock-domain issues, run the first complete system tests, and where possible test the integrated design on the DE1-SoC board.
+
+The exact day and time are **pending and negotiable** and will be agreed by the group once individual availability is known. Subsystem owners should aim to have their current working code committed before this session so that the meeting can focus on integration rather than first-time module development.
+
+If a common in-person time cannot be arranged, integration will instead be completed remotely using Git, shared Verilator testbenches, simulation results and group chat. Since the physical DE1-SoC board is held by Jason, Jason will perform any board programming and physical hardware checks required during remote integration, while Luke and Advay remain responsible for debugging and updating their respective audio and video subsystems.
+
 ## Schedule-protection / takeover rule
 
 To manage the risk of late or sub-standard subsystem delivery:
@@ -474,6 +484,7 @@ Targets:
 | Sat 26 Sep | Integration harness with mocked subsystems | Audio subsystem TBs | Video subsystem TBs | Standalone tests running |
 | Sun 27 Sep | Review interfaces; update top-level | Fixed-point/numerical verification | Backpressure/packet verification | Subsystem Review 1 |
 | Mon 28 Sep | Merge verified reuse | Import MP2 audio if released; regression | Import MP2 video if released; regression | MP2 baseline imported |
+| **TBC — week of 28 Sep** | Coordinate shared integration session and board access | Attend integration session and debug audio/classifier subsystem | Attend integration session and debug video/boundary subsystem | **Proposed in-person university integration session; exact day subject to group availability. integration done remotely through group chats if a common time cannot be arranged.** |
 | Tue 29 Sep | Integrate Game/Control with Luke; resolve game-side CDC | Integrate Audio/Classifier with Jason; fix audio-side issues | Deliver and integrate clean boundary/mask interface | Audio→game working |
 | Wed 30 Sep | Integrate game outputs into shared top-level; run full simulation | Debug audio path in shared top-level | Integrate game state into video overlay and debug VGA path | **First complete simulation — all three present** |
 | Thu 1 Oct | Maintain Quartus/QSF/SDC and coordinate fixes | Fix audio/classifier integration failures | Fix VGA/Platform Designer/video failures | **Shared full compile + timing report** |
@@ -553,6 +564,7 @@ The period after 4 October should be reserved for higher-grade feature upgrades,
 | VGA stream breaks under backpressure | Medium | High | Random-stall Avalon-ST tests | Advay |
 | Platform Designer/IP regeneration breaks build | Medium | Medium | Commit source metadata; document generation; tag known-good build | Jason/Advay |
 | Integration happens too late | Medium | High | Shared integration checkpoints; hard full-simulation deadline 30 Sep; board target 2 Oct | All (Jason leads) |
+| No common time available for an in-person integration session | Medium | Medium | Agree availability early; if no suitable common time exists, use a scheduled remote integration/debugging session with Git and simulation. Jason performs physical board tests while each subsystem owner remains responsible for fixing their own subsystem. | All |
 | A subsystem owner misses an agreed milestone or delivers below agreed integration quality | Medium | High | Recovery window, latest working commit, then documented integration-lead takeover only if needed to unblock schedule | All / Jason coordinates |
 | Work exists only locally | Medium | High | Frequent Git commits and contribution log | All |
 | Report evidence forgotten | Medium | Medium | Save evidence at verification time | All |
