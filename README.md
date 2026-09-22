@@ -605,6 +605,8 @@ The period after 4 October should be reserved for higher-grade feature upgrades,
 | VGA stream breaks under backpressure | Medium | High | Random-stall Avalon-ST tests | Advay |
 | Platform Designer/IP regeneration breaks build | Medium | Medium | Commit source metadata; document generation; tag known-good build | Jason/Advay |
 | Integration happens too late | Medium | High | Shared integration checkpoints; hard full-simulation deadline 30 Sep; board target 2 Oct | All (Jason leads) |
+| Limited physical board access | Low | Medium | Most RTL development and verification is completed through simulation. Jason retains the board and organises university hardware-testing sessions when another subsystem owner requests physical validation. | All / Jason coordinates board access |
+| Missed subsystem deadline or insufficient response to review feedback | Medium | High | Early milestones, peer review, 1–2 progress reminders, defined recovery period, then documented task takeover only if the delay blocks integration. | All |
 | No common time available for an in-person integration session | Medium | Medium | Agree availability early; if no suitable common time exists, use a scheduled remote integration/debugging session with Git and simulation. Jason performs physical board tests while each subsystem owner remains responsible for fixing their own subsystem. | All |
 | A subsystem owner misses an agreed milestone or delivers below agreed integration quality | Medium | High | Recovery window, latest working commit, then documented integration-lead takeover only if needed to unblock schedule | All / Jason coordinates |
 | Work exists only locally | Medium | High | Frequent Git commits and contribution log | All |
