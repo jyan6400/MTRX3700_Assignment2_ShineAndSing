@@ -292,154 +292,178 @@ MTRX3700_Assignment2_ShineAndSing/
 │
 ├── README.md
 ├── .gitignore
-├── run_all_tests.sh
+├── run_all_tests.sh                              # SHARED — Jason maintains
 │
 ├── rtl/
 │   │
 │   ├── top/
-│   │   └── top_level.sv                         # Jason
+│   │   └── top_level.sv                         # SHARED — Jason maintains
 │   │
 │   ├── common/
-│   │   ├── assignment2_pkg.sv                  # shared constants/types
-│   │   ├── synchroniser.v                      # reused
-│   │   ├── audio_game_cdc.sv                   # Jason
-│   │   └── game_video_cdc.sv                   # Jason / integration
+│   │   ├── assignment2_pkg.sv                  # SHARED — frozen constants/types
+│   │   ├── synchroniser.v                      # REUSED
+│   │   ├── audio_game_cdc.sv                   # NEW — Jason
+│   │   └── game_video_cdc.sv                   # NEW — Jason
 │   │
 │   ├── audio/
 │   │   │
 │   │   ├── lesson3_reuse/
-│   │   │   ├── i2c_master.sv
-│   │   │   ├── set_audio_encoder.sv
-│   │   │   ├── mic_load.sv
-│   │   │   ├── i2c_pll.v
-│   │   │   └── adc_pll.v
+│   │   │   ├── i2c_master.sv                   # REUSED — Luke
+│   │   │   ├── set_audio_encoder.sv            # REUSED — Luke
+│   │   │   ├── mic_load.sv                     # REUSED — Luke
+│   │   │   ├── i2c_pll.v                       # REUSED — Luke
+│   │   │   └── adc_pll.v                       # REUSED — Luke
 │   │   │
 │   │   ├── pitch_reuse/
-│   │   │   ├── low_pass_conv.sv
-│   │   │   ├── decimate.sv
-│   │   │   ├── window_function.sv
-│   │   │   ├── async_fifo.v
-│   │   │   ├── fft_input_buffer.sv
-│   │   │   ├── fft_mag_sq.sv
-│   │   │   ├── fft_find_peak.sv
-│   │   │   ├── fft_output_buffer.sv
-│   │   │   ├── fft_pitch_detect.sv
+│   │   │   ├── low_pass_conv.sv                # REUSED — Luke
+│   │   │   ├── decimate.sv                     # REUSED — Luke
+│   │   │   ├── window_function.sv              # REUSED — Luke
+│   │   │   ├── async_fifo.v                    # REUSED — Luke
+│   │   │   ├── fft_input_buffer.sv             # REUSED — Luke
+│   │   │   ├── fft_mag_sq.sv                   # REUSED — Luke
+│   │   │   ├── fft_find_peak.sv                # REUSED — Luke
+│   │   │   ├── fft_output_buffer.sv            # REUSED — Luke
+│   │   │   ├── fft_pitch_detect.sv             # REUSED — Luke
 │   │   │   └── fft_ip_r22sdf/
-│   │   │       └── ...                         # supplied FFT RTL
+│   │   │       ├── FFT.v                       # REUSED — supplied FFT RTL
+│   │   │       ├── Butterfly.v                 # REUSED — supplied FFT RTL
+│   │   │       ├── DelayBuffer.v               # REUSED — supplied FFT RTL
+│   │   │       ├── Multiply.v                  # REUSED — supplied FFT RTL
+│   │   │       ├── SdfUnit.v                   # REUSED — supplied FFT RTL
+│   │   │       ├── SdfUnit2.v                  # REUSED — supplied FFT RTL
+│   │   │       ├── SdfUnit_TC.v                # REUSED — supplied FFT RTL
+│   │   │       ├── Twiddle.v                   # REUSED — supplied FFT RTL
+│   │   │       ├── TwiddleConvert4.v           # REUSED — supplied FFT RTL
+│   │   │       └── TwiddleConvert8.v           # REUSED — supplied FFT RTL
 │   │   │
 │   │   ├── provided_classifier/
-│   │   │   ├── classifier.sv
-│   │   │   └── templates.svh
+│   │   │   ├── classifier.sv                   # PROVIDED — Luke integrates
+│   │   │   └── templates.svh                   # GENERATED — Luke
 │   │   │
 │   │   └── a2/
-│   │       ├── audio_gate.sv                   # Luke
-│   │       ├── band_energy_8.sv               # Luke, R-A2
-│   │       ├── band_normalise.sv               # Luke, R-A3
-│   │       ├── mel_filterbank_24.sv            # Luke, R-A4
-│   │       ├── log2_energy.sv                  # Luke, R-A4
-│   │       └── audio_features.sv               # Luke wrapper
+│   │       ├── audio_gate.sv                   # NEW — Luke, R-A1
+│   │       ├── band_energy_8.sv                # NEW — Luke, R-A2
+│   │       ├── band_normalise.sv               # NEW — Luke, R-A3
+│   │       ├── mel_filterbank_24.sv            # NEW — Luke, R-A4
+│   │       ├── log2_energy.sv                  # NEW — Luke, R-A4
+│   │       └── audio_features.sv               # NEW — Luke, subsystem wrapper
 │   │
 │   ├── video/
 │   │   │
 │   │   ├── lesson3_reuse/
-│   │   │   ├── vga_face.sv
-│   │   │   ├── video_pll.sv
-│   │   │   └── [other supplied VGA/Avalon files unchanged]
+│   │   │   ├── vga_face.sv                    # REUSED/ADAPTED — Advay
+│   │   │   ├── video_pll.sv                   # REUSED — Advay
+│   │   │   └── [other VGA/Avalon files]       # REUSED — Advay
 │   │   │
 │   │   ├── barcode_reuse/
-│   │   │   ├── conv3x3.sv
-│   │   │   ├── col_profile.sv
-│   │   │   ├── peak_pick.sv
-│   │   │   ├── [actual 1-D edge module from barcode workspace]
-│   │   │   └── [actual blanking/latch module from barcode workspace]
+│   │   │   ├── conv3x3.sv                     # REUSED/ADAPTED — Advay
+│   │   │   ├── col_profile.sv                 # REUSED/ADAPTED — Advay
+│   │   │   ├── peak_pick.sv                   # REUSED/ADAPTED — Advay
+│   │   │   ├── [1-D edge module]              # REUSED — Advay
+│   │   │   └── [blanking/frame latch module]  # REUSED — Advay
 │   │   │
 │   │   └── a2/
-│   │       ├── profile_normalise.sv            # Advay, R-V3
-│   │       ├── hysteresis_profile.sv            # Advay, R-V3
-│   │       ├── local_threshold.sv               # Advay, R-V4
-│   │       ├── key_mask_generator.sv            # Advay
-│   │       └── game_video_overlay.sv            # Advay
+│   │       ├── profile_normalise.sv            # NEW — Advay, R-V3
+│   │       ├── hysteresis_profile.sv           # NEW — Advay, R-V3
+│   │       ├── local_threshold.sv              # NEW — Advay, R-V4
+│   │       ├── key_mask_generator.sv           # NEW — Advay
+│   │       └── game_video_overlay.sv           # NEW — Advay
 │   │
 │   └── game/
-│       ├── game_fsm.sv                          # Jason
-│       ├── lane.sv                              # Jason
-│       ├── score.sv                             # Jason
-│       ├── timer.sv                             # Jason
-│       └── vowel_hit_mapper.sv                  # Jason
+│       ├── game_fsm.sv                         # REUSED/ADAPTED — Jason
+│       ├── lane.sv                             # REUSED/ADAPTED — Jason
+│       ├── score.sv                            # REUSED/ADAPTED — Jason
+│       ├── timer.sv                            # REUSED/ADAPTED — Jason
+│       └── vowel_hit_mapper.sv                 # NEW — Jason
 │
 ├── sim/
+│   │
 │   ├── models/
-│   │   ├── wm8731_model.sv
-│   │   └── vga_monitor_model.sv
+│   │   ├── wm8731_model.sv                    # REUSED simulation model — Luke
+│   │   └── vga_monitor_model.sv               # REUSED simulation model — Advay
 │   │
 │   ├── audio/
-│   │   ├── fft_pitch_detect_tb.sv
-│   │   ├── audio_gate_tb.sv
-│   │   ├── band_energy_8_tb.sv
-│   │   ├── band_normalise_tb.sv
-│   │   ├── mel_filterbank_24_tb.sv
-│   │   ├── log2_energy_tb.sv
-│   │   └── audio_subsystem_tb.sv
+│   │   ├── fft_pitch_detect_tb.sv             # REUSED regression — Luke
+│   │   ├── audio_gate_tb.sv                   # NEW — Luke
+│   │   ├── band_energy_8_tb.sv                # NEW — Luke
+│   │   ├── band_normalise_tb.sv               # NEW — Luke
+│   │   ├── mel_filterbank_24_tb.sv            # NEW — Luke
+│   │   ├── log2_energy_tb.sv                  # NEW — Luke
+│   │   └── audio_subsystem_tb.sv              # NEW — Luke
 │   │
 │   ├── video/
-│   │   ├── conv3x3_tb.sv
-│   │   ├── col_profile_tb.sv
-│   │   ├── peak_pick_tb.sv
-│   │   ├── profile_normalise_tb.sv
-│   │   ├── local_threshold_tb.sv
-│   │   ├── key_mask_generator_tb.sv
-│   │   ├── game_video_overlay_tb.sv
-│   │   └── video_subsystem_tb.sv
+│   │   ├── conv3x3_tb.sv                      # REUSED/ADAPTED regression — Advay
+│   │   ├── col_profile_tb.sv                  # REUSED/ADAPTED regression — Advay
+│   │   ├── peak_pick_tb.sv                    # REUSED/ADAPTED regression — Advay
+│   │   ├── profile_normalise_tb.sv            # NEW — Advay
+│   │   ├── hysteresis_profile_tb.sv           # NEW — Advay
+│   │   ├── local_threshold_tb.sv              # NEW — Advay
+│   │   ├── key_mask_generator_tb.sv           # NEW — Advay
+│   │   ├── game_video_overlay_tb.sv           # NEW — Advay
+│   │   └── video_subsystem_tb.sv              # NEW — Advay
 │   │
 │   ├── game/
-│   │   ├── vowel_hit_mapper_tb.sv
-│   │   ├── game_fsm_tb.sv
-│   │   ├── score_tb.sv
-│   │   └── game_subsystem_tb.sv
+│   │   ├── vowel_hit_mapper_tb.sv             # NEW — Jason
+│   │   ├── game_fsm_tb.sv                     # REUSED/ADAPTED — Jason
+│   │   ├── lane_tb.sv                         # REUSED/ADAPTED — Jason
+│   │   ├── score_tb.sv                        # REUSED/ADAPTED — Jason
+│   │   ├── audio_game_cdc_tb.sv               # NEW — Jason
+│   │   ├── game_video_cdc_tb.sv               # NEW — Jason
+│   │   └── game_subsystem_tb.sv               # NEW — Jason
 │   │
 │   └── system/
-│       └── top_level_tb.sv
+│       └── top_level_tb.sv                    # SHARED — Jason maintains
 │
 ├── quartus/
-│   ├── assignment2.qpf
-│   ├── assignment2.qsf
-│   ├── assignment2.sdc
-│   ├── *.qsys
+│   ├── assignment2.qpf                        # SHARED — Jason maintains
+│   ├── assignment2.qsf                        # SHARED — Jason maintains
+│   ├── assignment2.sdc                        # SHARED — Jason maintains
+│   ├── *.qsys                                 # SHARED — Jason/Advay
 │   └── ip/
+│       └── [generated IP files]               # SHARED / generated
 │
 ├── memory/
-│   ├── piano0.mif
-│   ├── piano1.mif
-│   ├── piano2.mif
-│   └── test_waveform.hex
+│   ├── piano0.mif                            # PROVIDED — Advay
+│   ├── piano1.mif                            # PROVIDED — Advay
+│   ├── piano2.mif                            # PROVIDED at demo — Advay/Jason compile
+│   └── test_waveform.hex                     # REUSED — Luke
 │
 ├── tools/
+│   │
 │   ├── audio/
-│   │   ├── audio_model.py
-│   │   ├── A2_audio_modelling.ipynb
-│   │   ├── mfcc_walkthrough.ipynb
-│   │   ├── train_templates.py
-│   │   └── make_test_templates.py
+│   │   ├── audio_model.py                    # PROVIDED/ADAPTED — Luke
+│   │   ├── A2_audio_modelling.ipynb          # PROVIDED resource — Luke
+│   │   ├── mfcc_walkthrough.ipynb            # PROVIDED resource — Luke
+│   │   ├── train_templates.py                # PROVIDED — Luke
+│   │   └── make_test_templates.py            # PROVIDED — Luke
 │   │
 │   └── video/
-│       ├── A2_video_modelling.ipynb
-│       ├── video_model.py
-│       └── image_conversion_script.py
+│       ├── A2_video_modelling.ipynb          # PROVIDED resource — Advay
+│       ├── video_model.py                    # PROVIDED/ADAPTED — Advay
+│       └── image_conversion_script.py        # PROVIDED — Advay
 │
 └── docs/
-    ├── interface_contract.md
-    ├── fixed_point_table.md
-    ├── clock_domain_map.md
+    │
+    ├── interface_contract.md                 # SHARED — Jason maintains
+    ├── fixed_point_table.md                  # Luke
+    ├── clock_domain_map.md                   # SHARED — Jason maintains
+    │
     ├── report_evidence/
     │   ├── waveforms/
-    │   ├── timing/
-    │   ├── quartus/
-    │   └── screenshots/
+    │   │   ├── audio/                        # Luke
+    │   │   ├── video/                        # Advay
+    │   │   ├── game/                         # Jason
+    │   │   └── system/                       # SHARED
+    │   │
+    │   ├── timing/                           # SHARED — Jason maintains
+    │   ├── quartus/                          # SHARED — Jason maintains
+    │   └── screenshots/                      # ALL
+    │
     └── project_management/
-        ├── meeting_minutes.md
-        ├── decision_log.md
-        ├── risk_register.md
-        └── contribution_log.md
+        ├── meeting_minutes.md                # SHARED
+        ├── decision_log.md                   # SHARED
+        ├── risk_register.md                  # SHARED
+        └── contribution_log.md               # SHARED
 ```
 
 ---
