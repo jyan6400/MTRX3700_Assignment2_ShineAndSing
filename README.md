@@ -352,22 +352,23 @@ MTRX3700_Assignment2_ShineAndSing/
 │   │   │
 │   │   ├── lesson3_reuse/
 │   │   │   ├── vga_face.sv                    # REUSED/ADAPTED — Advay
-│   │   │   ├── video_pll.sv                   # REUSED — Advay
-│   │   │   └── [other VGA/Avalon files]       # REUSED — Advay
+│   │   │   └── video_pll.sv                   # REUSED — Advay
 │   │   │
 │   │   ├── barcode_reuse/
 │   │   │   ├── conv3x3.sv                     # REUSED/ADAPTED — Advay
 │   │   │   ├── col_profile.sv                 # REUSED/ADAPTED — Advay
 │   │   │   ├── peak_pick.sv                   # REUSED/ADAPTED — Advay
-│   │   │   ├── [1-D edge module]              # REUSED — Advay
-│   │   │   └── [blanking/frame latch module]  # REUSED — Advay
+│   │   │   ├── sobel.sv                       # REUSED — Advay
+│   │   │   ├── cdc_latch.sv                   # REUSED — Advay
+│   │   │   └── raster_source.sv               # REUSED — Advay
 │   │   │
 │   │   └── a2/
 │   │       ├── profile_normalise.sv            # NEW — Advay, R-V3
 │   │       ├── hysteresis_profile.sv           # NEW — Advay, R-V3
 │   │       ├── local_threshold.sv              # NEW — Advay, R-V4
 │   │       ├── key_mask_generator.sv           # NEW — Advay
-│   │       └── game_video_overlay.sv           # NEW — Advay
+│   │       ├── game_video_overlay.sv           # NEW — Advay
+│   │       └── video_subsystem.sv              # NEW — Advay [OPTIONAL to test integrated video path]
 │   │
 │   └── game/
 │       ├── game_fsm.sv                         # REUSED/ADAPTED — Jason
