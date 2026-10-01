@@ -21,10 +21,10 @@
 module band_check #(
     parameter bit BIT_REVERSED = 1'b1,
     parameter logic [8:0][9:0] BAND_EDGES =
-        {10'd341, 10'd299, 10'd256, 10'd213, 10'd171, 10'd128, 10'd85, 10'd43, 10'd2},
+        {10'd512, 10'd448, 10'd384, 10'd320, 10'd256, 10'd192, 10'd128, 10'd64, 10'd0},
     parameter int OUT_SHIFT = 16,
-    parameter int EXP_LO [8] = '{2, 43, 85, 128, 171, 213, 256, 299},     // first bin of band
-    parameter int EXP_HI [8] = '{42, 84, 127, 170, 212, 255, 298, 340},   // last bin of band
+    parameter int EXP_LO [8] = '{0, 64, 128, 192, 256, 320, 384, 448},      // first bin of band
+    parameter int EXP_HI [8] = '{63, 127, 191, 255, 319, 383, 447, 511},    // last bin of band
     parameter string NAME = "A",
     parameter bit FULL_SWEEP = 1'b1
 ) (

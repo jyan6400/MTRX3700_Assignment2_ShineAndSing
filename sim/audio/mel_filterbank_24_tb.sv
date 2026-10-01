@@ -26,10 +26,10 @@ module mel_filterbank_24_tb;
     localparam longint MAGMAX = (64'd1 << MAG_W) - 1;
     localparam int LAT   = 4;
 
-    // expected Mel points (100-5000 Hz, 24 filters, fs 12 kHz, N 1024)
-    localparam int PTS [NM+2] = '{9, 14, 20, 27, 34, 41, 50, 59, 68, 79, 90, 102, 115,
-                                  130, 145, 162, 180, 200, 221, 244, 269, 296, 325,
-                                  356, 390, 427};
+    // expected Mel points = audio_model.mel_bank(nf=24, fmin=100, fmax=6000), fs 12 kHz, N 1024
+    localparam int PTS [NM+2] = '{9, 15, 21, 28, 36, 45, 54, 64, 75, 87, 100, 114, 130,
+                                  146, 165, 185, 206, 230, 256, 284, 314, 347, 383,
+                                  423, 465, 512};
 
     logic clk = 1'b0;
     always #5 clk = ~clk;
