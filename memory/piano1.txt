@@ -1,0 +1,2 @@
+what=supplied picture 2 (memory/originals/supplied_piano_2.png)
+edges=19 60 98 136 172 210 249 300

@@ -1,0 +1,2 @@
+what=photo-like: picture 0 + lighting gradient, noise, shadow at x ~ 78..86
+edges=10 34 66 99 132 164 196 228 260 292 310
