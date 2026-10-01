@@ -45,7 +45,10 @@ module audio_features #(
     parameter int DMAX          = 65535,     // classifier: reject if nearest distance > DMAX
     parameter int RHO_NUM       = 7,         // classifier: reject if d1/d2 > RHO_NUM/RHO_DEN
     parameter int RHO_DEN       = 10,
-    parameter int BAND_SHIFT    = 16,        // R-A2 energy scaling
+    parameter int BAND_SHIFT    = 8,         // R-A2 energy scaling. FFT.v scales by 1/N, so a
+                                             // sung harmonic of amplitude a gives |X|^2 ~ (0.27a)^2:
+                                             // a 60 dB voice puts ~2^18 in a band -> ~1000 here,
+                                             // +36 dB saturates. Calibrate on SignalTap captures.
     parameter bit LOG_MEAN_NORM = 1'b1,      // R-A4 level normalisation
     // derived -- do not override
     parameter int D             = (RUNG == 1) ? 1 : (RUNG == 4) ? 24 : 8

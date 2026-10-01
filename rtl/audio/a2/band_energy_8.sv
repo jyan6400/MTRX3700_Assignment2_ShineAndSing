@@ -35,7 +35,7 @@ module band_energy_8 #(
     parameter int NB           = 8,
     parameter logic [NB:0][9:0] BAND_EDGES =
         {10'd512, 10'd448, 10'd384, 10'd320, 10'd256, 10'd192, 10'd128, 10'd64, 10'd0},
-    parameter int OUT_SHIFT    = 16,
+    parameter int OUT_SHIFT    = 8,              // see BAND_SHIFT in audio_features.sv
     parameter int ACC_W        = MAG_W + $clog2(N / 2)
 ) (
     input  logic                        clk,
