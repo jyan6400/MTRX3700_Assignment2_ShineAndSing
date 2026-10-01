@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 // =============================================================================
 // band_energy_8.sv  --  NEW, Luke Mouawad, R-A2 (energy in eight bands)
 // -----------------------------------------------------------------------------
@@ -9,18 +10,20 @@
 //                  output order), k = i otherwise. Gaps in mag_valid are fine.
 //   Ownership    : band b owns bins BAND_EDGES[b] <= k < BAND_EDGES[b+1]
 //                  (lower edge inclusive, upper edge exclusive). Bins outside
-//                  [BAND_EDGES[0], BAND_EDGES[NB]) -- DC and the mirrored half
-//                  k >= N/2 -- are ignored.
+//                  [BAND_EDGES[0], BAND_EDGES[NB]) -- the mirrored half
+//                  k >= N/2 and the Nyquist bin 512 -- are ignored.
 //   Output       : band_acc[b]  raw energy sum, ACC_W bits, never overflows
 //                  feature[b]   = saturate16(band_acc[b] >> OUT_SHIFT)
 //                  feature_valid: one-clock pulse per completed frame, one
 //                  clock after the frame's last bin; outputs held until the
 //                  next frame completes.
 //
-// Default edges: 8 equal 500 Hz bands, 0-4 kHz at fs = 12 kHz, N = 1024
-// (11.72 Hz per bin); bins 0,1 excluded. See tools/audio/gen_audio_tables.py.
-//   band : 0      1      2       3       4       5       6       7
-//   bins : 2-42   43-84  85-127  128-170 171-212 213-255 256-298 299-340
+// Default edges = tools/audio/audio_model.py band_energies(): 8 equal bands of
+// 64 bins (750 Hz) over 0-6 kHz, BAND_EDGES[b] = 64*b (print with rtl_tables()).
+//   band : 0     1       2        3        4        5        6        7
+//   bins : 0-63  64-127  128-191  192-255  256-319  320-383  384-447  448-511
+//   Hz   : 0-750 ...                                                  5250-6000
+// Bin 0 (DC) is kept as in the model; the WM8731 ADC high-pass removes the DC.
 //
 // Clock/reset domain : FFT clock (18.432 MHz), synchronous active-high reset.
 // Reset clears the partial frame and the bin counter (frame re-alignment).
@@ -31,7 +34,7 @@ module band_energy_8 #(
     parameter bit BIT_REVERSED = 1'b1,
     parameter int NB           = 8,
     parameter logic [NB:0][9:0] BAND_EDGES =
-        {10'd341, 10'd299, 10'd256, 10'd213, 10'd171, 10'd128, 10'd85, 10'd43, 10'd2},
+        {10'd512, 10'd448, 10'd384, 10'd320, 10'd256, 10'd192, 10'd128, 10'd64, 10'd0},
     parameter int OUT_SHIFT    = 16,
     parameter int ACC_W        = MAG_W + $clog2(N / 2)
 ) (

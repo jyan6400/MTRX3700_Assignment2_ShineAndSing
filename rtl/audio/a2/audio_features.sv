@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 // =============================================================================
 // audio_features.sv  --  NEW, Luke Mouawad, audio subsystem wrapper (FFT side)
 // -----------------------------------------------------------------------------
@@ -40,7 +41,10 @@ module audio_features #(
     parameter int FW            = 16,
     parameter int NCLASS        = 4,
     parameter int NT            = 4,
-    parameter int M             = 5,
+    parameter int M             = 5,         // classifier vote length (odd)
+    parameter int DMAX          = 65535,     // classifier: reject if nearest distance > DMAX
+    parameter int RHO_NUM       = 7,         // classifier: reject if d1/d2 > RHO_NUM/RHO_DEN
+    parameter int RHO_DEN       = 10,
     parameter int BAND_SHIFT    = 16,        // R-A2 energy scaling
     parameter bit LOG_MEAN_NORM = 1'b1,      // R-A4 level normalisation
     // derived -- do not override
@@ -201,7 +205,8 @@ module audio_features #(
     endgenerate
 
     // ---------------- provided classifier (unchanged) -----------------------
-    classifier #(.D(D), .FW(FW), .NCLASS(NCLASS), .NT(NT), .M(M)) u_classifier (
+    classifier #(.D(D), .FW(FW), .NCLASS(NCLASS), .NT(NT), .M(M),
+                 .DMAX(DMAX), .RHO_NUM(RHO_NUM), .RHO_DEN(RHO_DEN)) u_classifier (
         .clk          (clk),
         .reset        (reset),
         .feature      (feature),

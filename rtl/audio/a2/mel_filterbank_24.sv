@@ -1,10 +1,15 @@
+`timescale 1ns/1ps
 // =============================================================================
 // mel_filterbank_24.sv  --  NEW, Luke Mouawad, R-A4 (24 Mel-spaced bands)
 // -----------------------------------------------------------------------------
 // Triangular Mel filterbank applied to the FFT magnitude-squared stream.
 //
 //   Points      : MEL_PTS[0..NM+1], FFT bins equally spaced on the Mel scale
-//                 (default 24 filters, 100-5000 Hz; tools/audio/gen_audio_tables.py)
+//                 = tools/audio/audio_model.py mel_bank(nf=24, fmin=100, fmax=6000):
+//                   mel(f) = 2595*log10(1 + f/700)
+//                   f_j    = mel^-1( mel(100) + j*(mel(6000)-mel(100))/25 ), j = 0..25
+//                   MEL_PTS[j] = round(f_j * N / fs), N = 1024, fs = 12000
+//                 (print with audio_model.rtl_tables())
 //   Filter m    : rises on  [MEL_PTS[m],   MEL_PTS[m+1])  weight 0 -> 1
 //                 falls on  [MEL_PTS[m+1], MEL_PTS[m+2])  weight 1 -> 0
 //   A bin k in segment s (MEL_PTS[s] <= k < MEL_PTS[s+1]) therefore feeds
@@ -37,10 +42,10 @@ module mel_filterbank_24 #(
     parameter bit BIT_REVERSED = 1'b1,
     parameter int NM           = 24,
     parameter logic [NM+1:0][9:0] MEL_PTS =
-        {10'd427, 10'd390, 10'd356, 10'd325, 10'd296, 10'd269, 10'd244, 10'd221,
-         10'd200, 10'd180, 10'd162, 10'd145, 10'd130, 10'd115, 10'd102, 10'd90,
-         10'd79,  10'd68,  10'd59,  10'd50,  10'd41,  10'd34,  10'd27,  10'd20,
-         10'd14,  10'd9},
+        {10'd512, 10'd465, 10'd423, 10'd383, 10'd347, 10'd314, 10'd284, 10'd256,
+         10'd230, 10'd206, 10'd185, 10'd165, 10'd146, 10'd130, 10'd114, 10'd100,
+         10'd87,  10'd75,  10'd64,  10'd54,  10'd45,  10'd36,  10'd28,  10'd21,
+         10'd15,  10'd9},
     parameter int W_F          = 10,             // weight fraction bits
     parameter int RS           = 16,             // extra reciprocal bits
     parameter int ACC_W        = MAG_W + W_F + $clog2(N / 2)
