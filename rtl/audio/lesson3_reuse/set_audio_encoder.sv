@@ -1,5 +1,5 @@
 module set_audio_encoder (
-    input      i2c_clk, // Assuming a 20 kHz clock is input (for testbench)
+    input      i2c_clk, // The I2C bit clock: 20 kHz in the testbench, 100 kHz on the board (clock_divider.sv)
     output     I2C_SCLK,
     inout      I2C_SDAT
 );
@@ -21,7 +21,7 @@ module set_audio_encoder (
         next_state = LOAD;
         case (state)
             LOAD : next_state = initialise_index < INIT_CMDS_N ? WAIT : LOAD; // Stop sending to the audio encoder chip after we step through all initialisation commands.
-            WAIT : next_state = ready ? (error === 1 ? LOAD : NEXT) : WAIT;  // Wait until the I2C module is finished sending bits. If it finished but there was an error, try again by restarting from the LOAD state.
+            WAIT : next_state = ready ? (error === 1 ? LOAD : NEXT) : WAIT;  // Wait until the I2C module is finished sending bits. If it finished but there was an error (no ACK from the chip), try the same command again by restarting from the LOAD state.
             NEXT : next_state = LOAD; 
         endcase
     end
@@ -43,6 +43,7 @@ module set_audio_encoder (
     always_comb begin : config_data_cmds
         case(initialise_index)
             //    Audio Config Data  // Format: {7 bits for reg, 9 bits for value}
+            0:        reg_and_data    <=    {7'h0F, 9'h000}; // RESET:             Writing 0 to register 15 resets every register to its power-on default (datasheet p.51). Always start here.
             1:        reg_and_data    <=    {7'h00, 9'hFF}; // Set SET_LIN_L:     +12dB left channel line input volume, enable mute to ADC, disable simultaneous load.
             2:        reg_and_data    <=    {7'h01, 9'hFF}; // Set SET_LIN_R:     +12dB right channel line input volume, enable mute to ADC, disable simultaneous load.
             3:        reg_and_data    <=    {7'h02, 9'hFD}; // Set SET_HEAD_L:    +4dB left channel headphone output volume, zero cross detect enabled, disable simultaneous load.
@@ -57,3 +58,4 @@ module set_audio_encoder (
         endcase
     end
 endmodule
+
