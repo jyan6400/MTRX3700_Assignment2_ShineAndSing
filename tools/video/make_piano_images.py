@@ -24,11 +24,10 @@ import os
 import sys
 
 import numpy as np
-from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import video_model                                       # noqa: E402
-from img_io import W, H, write_all                       # noqa: E402
+from image_conversion_script import convert, write_all   # noqa: E402
 
 TRUTH = {
     0: ("supplied picture 1 (memory/originals/supplied_piano_1.png)",
@@ -38,20 +37,11 @@ TRUTH = {
 }
 
 
-def convert(src):
-    """image_conversion_script.py's conversion: greyscale, fit inside 320x240, grey (128) letterbox."""
-    im = Image.open(src).convert("L")
-    im.thumbnail((W, H))
-    canvas = Image.new("L", (W, H), 128)
-    canvas.paste(im, ((W - im.width) // 2, (H - im.height) // 2))
-    return np.asarray(canvas, dtype=np.uint8)
-
-
 def main():
     out_dir = sys.argv[1] if len(sys.argv) > 1 else "memory"
     orig = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "memory", "originals")
     os.makedirs(out_dir, exist_ok=True)
-    pics = [convert(os.path.join(orig, "supplied_piano_1.png")), convert(os.path.join(orig, "supplied_piano_2.png"))]
+    pics = [convert(os.path.join(orig, f"supplied_piano_{n}.png"))[0] for n in (1, 2)]
     video_model.rng = np.random.default_rng(37)          # the notebook's seed: same picture every run
     # the shadow sits across the middle of the key 66..99 (a cable / a stand over one key)
     pics.append(video_model.photo_like(pics[0].astype(float), gradient=0.8, noise=7, shadow=(79, 4)))

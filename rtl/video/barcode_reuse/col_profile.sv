@@ -3,7 +3,7 @@
  *  REUSED MODULE -- Lesson 2.3c / Mini-Project 2 (barcode reader), Advay's completed col_profile.sv.
  *  CHANGES FOR ASSIGNMENT 2: none. The piano's rows (Y0 = 150, Y1 = 176: below the black keys and
  *  above the bottom of the white keys in both supplied pictures) and X_LAST are parameters set in
- *  video_analysis.sv.
+ *  video_subsystem.sv.
  *
  *  col_profile.sv -- sum a per-pixel value down each column: a projection of the picture
  *  onto the x axis.

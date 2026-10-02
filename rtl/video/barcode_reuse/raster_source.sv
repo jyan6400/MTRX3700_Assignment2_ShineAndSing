@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 /*
  *  REUSED MODULE -- Mini-Project 2 (barcode reader) workspace, rtl/raster_source.sv. CHANGES: none.
- *  In A2 it sweeps the selected piano picture for video_analysis.sv (GAP = 2048).
+ *  In A2 it sweeps the selected piano picture for video_subsystem.sv (GAP = 2048).
  */
 /*
  *  raster_source.sv -- sweep the picture out of its ROM as a pixel stream with coordinates,

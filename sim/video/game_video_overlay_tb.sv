@@ -9,13 +9,16 @@
  *                read would fail here), no missing pixels; vblank only while presenting pixel (0,0)
  *    game view   each lane's colour from the game state latched at the previous frame's end:
  *                idle tint, a note's amber brightening with lane_count, red in the hit window, green for
- *                FLASH_FRAMES frames after a hit pulse; the picture untouched outside the lanes; every
- *                dot of the 5-digit score; the "no keys" marker when lanes_valid = 0
+ *                FLASH_FRAMES frames after a hit pulse; the picture untouched outside the lanes; the
+ *                "no keys" marker when lanes_valid = 0
+ *    digits      the overlay's own 3x5 dot font: every pixel of every dot of the 5-digit score, with
+ *                scores that between them show all ten digits; the vowel id written on each lane; the
+ *                readout digits in the debug views
  *    mid-frame   the game state and the view are changed in the middle of a frame: that frame must show
  *                none of it, the next one all of it
  *    edge view   every probed pixel = the edge map value, replicated to 8 bits
  *    profile     the bar, the high and low threshold lines and the kept/dropped boundary lines
- *    masks       the four lane colours and the boundary lines; the readout digits in the debug views
+ *    masks       the four lane colours and the boundary lines
  *    reset       a reset in the middle of a frame: the source restarts cleanly at (0,0)
  *  Every expected value is computed by the bench (its own font, colour rules and memories).
  */
@@ -94,10 +97,10 @@ module game_video_overlay_tb;
     end
 
     // ---- expected colours ----
-    string font [16] = '{ "####.##.##.####", ".#.##..#..#.###", "###..#####..###", "###..####..####",
+    // the 3x5 font drawn as rows, top to bottom ('#' lit), digits 0..9
+    string font [10] = '{ "####.##.##.####", ".#.##..#..#.###", "###..#####..###", "###..####..####",
                           "#.##.####..#..#", "####..###..####", "####..####.####", "###..#..#..#..#",
-                          "####.#####.####", "####.####..####", "####.#####.##.#", "#..#..####.####",
-                          "####..#..#..###", "..#..#####.####", "####..####..###", "####..####..#.." };
+                          "####.#####.####", "####.####..####" };
     function automatic logic [23:0] rgb(int r, int g, int b); return {8'(r), 8'(g), 8'(b)}; endfunction
     function automatic int sat8(int v); return (v > 255) ? 255 : (v < 0) ? 0 : v; endfunction
 
@@ -129,10 +132,19 @@ module game_video_overlay_tb;
                 for (int d = 0; d < 5; d++) begin
                     int digit, p10; p10 = 1; for (int k = 0; k < 4 - d; k++) p10 *= 10;
                     digit = (s.score / p10) % 10;
-                    for (int r = 0; r < 5; r++) for (int c = 0; c < 3; c++)
-                        expect_px(8 + d * 16 + c * 4 + 1, 8 + r * 4 + 1,
+                    // every pixel of every 4x4 dot, and the dark column between two digits
+                    for (int r = 0; r < 5; r++) for (int c = 0; c < 3; c++) for (int oy = 0; oy < 4; oy++) for (int ox = 0; ox < 4; ox++)
+                        expect_px(8 + d * 16 + c * 4 + ox, 8 + r * 4 + oy,
                                   (font[digit].getc(3 * r + c) == "#") ? rgb(255, 220, 40) : rgb(16, 16, 16),
                                   $sformatf("score digit %0d (%0d)", d, digit));
+                    for (int oy = 0; oy < 20; oy++) expect_px(8 + d * 16 + 13, 8 + oy, rgb(16, 16, 16), "gap between score digits");
+                end
+                // the vowel id on each lane: lit dots are black, the rest keeps the lane's colour
+                if (s.lanes) for (int i = 0; i < 4; i++) for (int r = 0; r < 5; r++) for (int c = 0; c < 3; c++) begin
+                    int lx, ly;
+                    lx = ((ll[i] + lr[i]) << SH) / 2 - 3 + c * 2; ly = ((MY1 + 1) << SH) - 14 + r * 2;
+                    if (font[i].getc(3 * r + c) == "#") expect_px(lx, ly, rgb(0, 0, 0), $sformatf("lane %0d label", i));
+                    else if (cap[ly][lx] === 24'h000000) $fatal(1, "FAIL frame %0d: lane %0d label has a dot at row %0d col %0d that the font does not", frames_done, i, r, c);
                 end
             end
             1: for (int k = 0; k < 40; k++) begin
@@ -188,6 +200,7 @@ module game_video_overlay_tb;
         next_frame();
         // idle lanes, a score
         score = 16'd12345; mid_frame(); next_frame();
+        score = 16'd6789;  mid_frame(); next_frame();            // "06789": with 12345, all ten digits
         // notes counting down on lanes 1 and 2, a hit window on lane 0; lane 3 idle
         lane_active = 4'b0110; lane_count[1] = 15; lane_count[2] = 4; lane_hit_window = 4'b0001;
         mid_frame(); next_frame();

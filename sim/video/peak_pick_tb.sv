@@ -4,7 +4,7 @@
  *  -- two sides of one gap --, a plateau at 30/31, 50, noise below thr; min_gap 1 keeps all five,
  *  min_gap 4 keeps 10, 30, 50), extended for Assignment 2: $fatal on the first mismatch, "ALL TESTS
  *  PASSED", and 200 random profiles compared with a reference picker the bench computes (the R-V2
- *  picker in video_analysis.sv), including closely spaced false peaks and profiles with more than
+ *  picker in video_subsystem.sv), including closely spaced false peaks and profiles with more than
  *  NMAX peaks.
  */
 module peak_pick_tb;

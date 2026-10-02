@@ -4,7 +4,7 @@
  *  Y0..Y1 only; a second frame must start from zero -- the tag trick; one done per frame), extended for
  *  Assignment 2: $fatal on the first mismatch, "ALL TESTS PASSED", a third frame with random values
  *  checked against a sum the bench computes, and the piano's own row window (150..176) on a
- *  full-width picture with X_LAST = W-4, as video_analysis.sv instantiates it.
+ *  full-width picture with X_LAST = W-4, as video_subsystem.sv instantiates it.
  */
 module col_profile_tb;
     localparam int W = 16, H = 8, Y0 = 2, Y1 = 5;

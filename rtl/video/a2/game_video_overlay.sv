@@ -227,12 +227,45 @@ module game_video_overlay #(
     assign on_lo  = (plo != '0) && between(hy, h_lo, hp_lo);
 
     // ------------------------------------------------------------------ text
+    // A 3 x 5 dot font for the decimal digits (5 rows of 3 dots, top row first; in each row the left
+    // dot is the high bit). Everything written on the screen is a decimal digit: the score, the vowel
+    // id on each lane and the debug readout.
+    function automatic logic [14:0] font(input logic [3:0] d);
+        case (d)
+            4'd0: return 15'b111_101_101_101_111;
+            4'd1: return 15'b010_110_010_010_111;
+            4'd2: return 15'b111_001_111_100_111;
+            4'd3: return 15'b111_001_111_001_111;
+            4'd4: return 15'b101_101_111_001_001;
+            4'd5: return 15'b111_100_111_001_111;
+            4'd6: return 15'b111_100_111_101_111;
+            4'd7: return 15'b111_001_001_001_001;
+            4'd8: return 15'b111_101_111_101_111;
+            4'd9: return 15'b111_101_111_001_111;
+            default: return 15'd0;                           // not a decimal digit: nothing drawn
+        endcase
+    endfunction
+    // Is screen pixel (px, py) a lit dot of `digit` drawn with its top-left corner at (x0, y0), each
+    // font dot being 2^sh x 2^sh pixels? (dx, dy are one bit wider: their top bit is set when the pixel
+    // is left of / above the glyph.)
+    function automatic logic glyph_on(input logic [SXW-1:0] px, input logic [SYW-1:0] py,
+                                      input logic [SXW-1:0] x0, input logic [SYW-1:0] y0,
+                                      input logic [3:0] digit, input int sh);
+        logic [SXW:0] dx, col; logic [SYW:0] dy, row; logic [14:0] f;
+        dx  = {1'b0, px} - {1'b0, x0};
+        dy  = {1'b0, py} - {1'b0, y0};
+        col = dx >> sh;
+        row = dy >> sh;
+        f   = font(digit);
+        if (!dx[SXW] && !dy[SYW] && col < 3 && row < 5) return f[14 - (3 * int'(row) + int'(col))];
+        return 1'b0;
+    endfunction
+
     // score: 5 digits at (8, 8) in the game view, on a dark box
     localparam int SP = 4 << SCORE_SH;                    // digit pitch
     logic [4:0] score_dot;
     for (genvar d = 0; d < 5; d++) begin : g_score
-        hex_glyph #(.XW(SXW), .YW(SYW), .SCALE_SH(SCORE_SH)) u_g (.px(x), .py(y),
-            .x0(SXW'(8 + d * SP)), .y0(SYW'(8)), .digit(f_bcd[(4-d)*4 +: 4]), .on(score_dot[d]));
+        assign score_dot[d] = glyph_on(x, y, SXW'(8 + d * SP), SYW'(8), f_bcd[(4-d)*4 +: 4], SCORE_SH);
     end
     logic in_score_box;
     assign in_score_box = (int'(x) >= 4) && (int'(x) < 12 + 5 * SP) && (int'(y) >= 4) && (int'(y) < 12 + (5 << SCORE_SH));
@@ -242,8 +275,7 @@ module game_video_overlay #(
     for (genvar i = 0; i < 4; i++) begin : g_label
         logic [SXW-1:0] lx;
         assign lx = SXW'(((32'(f_l[i]) + 32'(f_r[i])) << SH) / 2 - (3 * LD) / 2);
-        hex_glyph #(.XW(SXW), .YW(SYW), .SCALE_SH(HUD_SH)) u_g (.px(x), .py(y),
-            .x0(lx), .y0(SYW'(((MASK_Y1 + 1) << SH) - 7 * LD)), .digit(4'(i)), .on(label_dot[i]));
+        assign label_dot[i] = glyph_on(x, y, lx, SYW'(((MASK_Y1 + 1) << SH) - 7 * LD), 4'(i), HUD_SH);
     end
     // readout in the debug views: mode, edge detector, boundaries (decimal)
     logic [3:0] bc_tens, bc_ones;
@@ -256,8 +288,7 @@ module game_video_overlay #(
     assign hud_digit[2] = bc_tens;
     assign hud_digit[3] = bc_ones;
     for (genvar d = 0; d < 4; d++) begin : g_hud
-        hex_glyph #(.XW(SXW), .YW(SYW), .SCALE_SH(HUD_SH)) u_g (.px(x), .py(y),
-            .x0(SXW'(6 + d * 4 * LD + ((d >= 2) ? 2 * LD : 0))), .y0(SYW'(6)), .digit(hud_digit[d]), .on(hud_dot[d]));
+        assign hud_dot[d] = glyph_on(x, y, SXW'(6 + d * 4 * LD + ((d >= 2) ? 2 * LD : 0)), SYW'(6), hud_digit[d], HUD_SH);
     end
     logic in_hud_box;
     assign in_hud_box = (int'(x) >= 2) && (int'(x) < 10 + 18 * LD) && (int'(y) >= 2) && (int'(y) < 10 + 5 * LD);

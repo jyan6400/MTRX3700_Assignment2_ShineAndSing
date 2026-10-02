@@ -2,16 +2,15 @@
 """Bit-exact integer twin of the Assignment 2 video analysis RTL (rtl/video/*), so every number the hardware
 produces can be predicted here first, and the thresholds chosen on all three pictures before synthesis.
 
-Every function below is one module:
-    hdiff            a2/hdiff.sv                    |p[x] - p[x-1]|, x = 1..W-1
+Every function below is one block of the hardware:
+    hdiff            the 1-D difference in a2/video_subsystem.sv   |p[x] - p[x-1]|, x = 1..W-1
     conv3            barcode_reuse/conv3x3.sv        interior centres only, integer weights
     gauss            conv3x3 with [1 2 1; 2 4 2; 1 2 1], then >> 4        (R-V4 smoothing)
     profile          barcode_reuse/col_profile.sv    sum over rows Y0..Y1 inclusive
     normalise        a2/profile_normalise.sv         n = floor(p * 256 / max), 0..256
     local_thr        a2/local_threshold.sv           (k_q * sum of n over x-12..x+12) >> 10
-    hysteresis       a2/hysteresis_profile.sv        NMS + two thresholds + min_gap merge
-    pick_runs        a2/pick_runs.sv                runs above a threshold (R-V1)
-    peak_pick        barcode_reuse/peak_pick.sv      local maxima above thr + min_gap (R-V2)
+    hysteresis       a2/hysteresis_profile.sv        NMS + two thresholds + min_gap (R-V3, R-V4)
+    peak_pick        barcode_reuse/peak_pick.sv      local maxima above thr + min_gap (R-V1 1-D, R-V2 Sobel)
     lattice / lanes  a2/key_mask_generator.sv        median spacing, off-lattice boundaries dropped, 4 lanes
 
     python3 tools/video/hw_model.py        prints every mode on every picture in memory/
@@ -126,23 +125,6 @@ def hysteresis(n, hi, lo, min_gap):
     return out
 
 
-def pick_runs(p, thr, min_gap):
-    above = p > thr
-    out, i = [], 0
-    while i < W:
-        if above[i]:
-            j = i
-            while j < W and above[j]:
-                j += 1
-            c = (i + j - 1) // 2
-            if not (out and c - out[-1] < min_gap):
-                out.append(c)
-            i = j
-        else:
-            i += 1
-    return out
-
-
 def peak_pick(p, thr, min_gap):
     """peak_pick.sv (3.2d): examines x = 1..W-2."""
     out, last_v = [], 0
@@ -189,7 +171,7 @@ def lanes(kept, first=LANE_FIRST):
 
 
 # ------------------------------------------------------------------ the whole analysis
-MODES = {0: "R-V4 smooth+adaptive", 1: "R-V3 norm+NMS+hyst", 2: "R-V2 peak_pick", 3: "R-V1 pick_runs"}
+MODES = {0: "R-V4 smooth+adaptive", 1: "R-V3 norm+NMS+hyst", 2: "R-V1/R-V2 peak_pick"}      # SW7..6 (3 = 2)
 
 
 def analyse(img, mode=0, sobel=True, hi=HI_DEF, lo=LO_DEF, floor=FLOOR_DEF, k_q=K_Q_DEF, thr_abs=THR_ABS_DEF):
@@ -204,10 +186,8 @@ def analyse(img, mode=0, sobel=True, hi=HI_DEF, lo=LO_DEF, floor=FLOOR_DEF, k_q=
         found = hysteresis(n, hi_c, lo_c, GAP_RV4)
     elif mode == 1:
         found = hysteresis(n, np.full(W, hi), np.full(W, lo), GAP_RV3)
-    elif mode == 2:
+    else:                                               # R-V1 (1-D) / R-V2 (Sobel): one absolute threshold
         found = peak_pick(p, thr_abs, GAP_RV4)
-    else:
-        found = pick_runs(p, thr_abs, GAP_RV4)
     return dict(p=p, n=n, max=m, t=t, found=found, mag=mag, g=g, ok=ok)
 
 
@@ -224,7 +204,7 @@ if __name__ == "__main__":
         if not os.path.exists(f"{d}/piano{pic}.hex"):
             continue
         img, truth = load(pic, d)
-        for mode in range(4):
+        for mode in range(3):
             for sob in (True, False):
                 r = analyse(img, mode, sob)
                 kept, s = lattice(r["found"])

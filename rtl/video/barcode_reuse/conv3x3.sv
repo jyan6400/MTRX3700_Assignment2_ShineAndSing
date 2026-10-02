@@ -2,7 +2,7 @@
 /*
  *  REUSED MODULE -- Lesson 2.3b / Mini-Project 2 (barcode reader), Advay's completed conv3x3.sv.
  *  CHANGES FOR ASSIGNMENT 2: none. A second instance with the smoothing table
- *  [1 2 1; 2 4 2; 1 2 1] (then >> 4) runs before the Sobel instances at R-V4 (video_analysis.sv);
+ *  [1 2 1; 2 4 2; 1 2 1] (then >> 4) runs before the Sobel instances at R-V4 (video_subsystem.sv);
  *  that is a different parameter K, not a change to this file.
  *
  *  conv3x3.sv -- a 3x3 convolution over a streaming raster image, with two line buffers.
