@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Video subsystem test suite (Advay) -- Verilator 5.050, run from anywhere:
 #
 #   sh sim/video/run_video_tests.sh              every video bench (10), the subsystem bench last
