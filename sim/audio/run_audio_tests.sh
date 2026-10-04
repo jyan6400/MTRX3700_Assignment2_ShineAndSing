@@ -40,7 +40,7 @@ declare -A SRC REQ LEGACY
 SM="$ROOT/sim/models"
 SRC[tb_fft_mag_sq]="$PR/fft_mag_sq.sv $TB/tb_fft_mag_sq.sv"
 SRC[tb_fft_find_peak]="$PR/fft_find_peak.sv $TB/tb_fft_find_peak.sv"
-SRC[tb_fft_input_buffer]="$PR/fft_input_buffer.sv $PR/async_fifo.sv $SM/dcfifo.v $TB/tb_fft_input_buffer.sv"
+SRC[tb_fft_input_buffer]="$PR/fft_input_buffer.sv $PR/async_fifo.v $SM/dcfifo.v $TB/tb_fft_input_buffer.sv"
 REQ[tb_fft_input_buffer]="$SM/dcfifo.v $ROOT/memory/test_waveform.hex"
 LEGACY[tb_fft_mag_sq]=1; LEGACY[tb_fft_find_peak]=1; LEGACY[tb_fft_input_buffer]=1
 SRC[window_function]="$PR/window_function.sv $TB/window_function_tb.sv"
