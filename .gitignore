@@ -1,3 +1,4 @@
 obj_dir/
 sim/audio/build/
 sim/video/build/
+sim/system/build/
