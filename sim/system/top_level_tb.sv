@@ -44,12 +44,20 @@ module top_level_tb;
     logic [6:0] HEX4;
     logic [6:0] HEX5;
 
+    integer audio_frame_count;
+    integer video_frame_count;
+
 
     // ============================================================
     // DUT
     // ============================================================
 
-    top_level DUT (
+    top_level #(
+        .VIDEO_IMG_W (320),
+        .VIDEO_IMG_H (240),
+        .VIDEO_VGA_W (32),
+        .VIDEO_VGA_H (24)
+    ) DUT (
         .CLOCK_50      (CLOCK_50),
         .KEY           (KEY),
         .SW            (SW),
@@ -97,35 +105,73 @@ module top_level_tb;
     end
 
 
-    // Approximate WM8731 BCLK:
+    // Accelerated WM8731 clocks for whole-system simulation.
     //
-    // 3.072 MHz
+    // Keep the hardware relationship:
     //
-    // Period = 325.52 ns
+    //     BCLK : ADCLRCK = 64 : 1
+    //
+    // but run both clocks much faster than the board so that several
+    // real audio frames can traverse the DSP pipeline in a short test.
     //
     initial begin
         AUD_BCLK = 1'b0;
 
-        forever #162.760
+        forever #2.5
             AUD_BCLK = ~AUD_BCLK;
     end
 
 
-    // Approximate 48 kHz ADC left/right clock.
-    //
     initial begin
         AUD_ADCLRCK = 1'b0;
 
-        forever #10416.667
+        forever #160
             AUD_ADCLRCK = ~AUD_ADCLRCK;
     end
 
 
-    // No real microphone waveform is needed for this integration
-    // test because classifier events are injected at the source side
-    // of audio_game_cdc.
+    // A deterministic zero-valued microphone stream is sufficient
+    // for the whole-system frame-flow test. Classifier/game behaviour
+    // is still tested deterministically by injecting a classifier event
+    // at the source side of audio_game_cdc.
     initial begin
         AUD_ADCDAT = 1'b0;
+    end
+
+
+    // ============================================================
+    // Whole-system frame monitors
+    // ============================================================
+
+    // One feature_valid pulse represents one completed audio feature
+    // frame produced by the real FFT/feature pipeline.
+    always @(posedge DUT.fft_clk) begin
+
+        if (DUT.reset_50) begin
+            audio_frame_count <= 0;
+        end
+
+        else if (DUT.feature_valid) begin
+            audio_frame_count <= audio_frame_count + 1;
+        end
+
+    end
+
+
+    // Count completed reduced-size Avalon-ST video frames.
+    always @(posedge DUT.pixel_clk) begin
+
+        if (DUT.reset_50) begin
+            video_frame_count <= 0;
+        end
+
+        else if (
+            DUT.video_valid &&
+            DUT.video_eop
+        ) begin
+            video_frame_count <= video_frame_count + 1;
+        end
+
     end
 
 
@@ -139,6 +185,92 @@ module top_level_tb;
 
         repeat (cycles)
             @(posedge CLOCK_50);
+
+    endtask
+
+
+    // ------------------------------------------------------------
+    // Wait until several real audio feature frames have traversed
+    // the integrated audio DSP pipeline.
+    // ------------------------------------------------------------
+
+    task automatic wait_for_audio_frames (
+        input int target_frames
+    );
+
+        int timeout;
+
+        begin
+
+            timeout = 0;
+
+            while (
+                audio_frame_count < target_frames &&
+                timeout < 1_000_000
+            ) begin
+
+                @(posedge CLOCK_50);
+
+                timeout = timeout + 1;
+
+            end
+
+
+            if (audio_frame_count < target_frames) begin
+
+                $fatal(
+                    1,
+                    "Audio frame timeout: expected %0d frames, observed %0d",
+                    target_frames,
+                    audio_frame_count
+                );
+
+            end
+
+        end
+
+    endtask
+
+
+    // ------------------------------------------------------------
+    // Wait until several complete reduced-size video frames have
+    // traversed the integrated video pipeline.
+    // ------------------------------------------------------------
+
+    task automatic wait_for_video_frames (
+        input int target_frames
+    );
+
+        int timeout;
+
+        begin
+
+            timeout = 0;
+
+            while (
+                video_frame_count < target_frames &&
+                timeout < 1_000_000
+            ) begin
+
+                @(posedge CLOCK_50);
+
+                timeout = timeout + 1;
+
+            end
+
+
+            if (video_frame_count < target_frames) begin
+
+                $fatal(
+                    1,
+                    "Video frame timeout: expected %0d frames, observed %0d",
+                    target_frames,
+                    video_frame_count
+                );
+
+            end
+
+        end
 
     endtask
 
@@ -578,11 +710,49 @@ module top_level_tb;
 
         // --------------------------------------------------------
         // TEST 2:
+        // Several real audio frames traverse the integrated DSP path.
+        // --------------------------------------------------------
+
+        $display(
+            "TEST 2: several audio frames"
+        );
+
+
+        wait_for_audio_frames(3);
+
+
+        $display(
+            "  PASS: observed %0d audio feature frames",
+            audio_frame_count
+        );
+
+
+        // --------------------------------------------------------
+        // TEST 3:
+        // Several reduced-size frames traverse the video subsystem.
+        // --------------------------------------------------------
+
+        $display(
+            "TEST 3: several reduced-size video frames"
+        );
+
+
+        wait_for_video_frames(3);
+
+
+        $display(
+            "  PASS: observed %0d reduced-size video frames",
+            video_frame_count
+        );
+
+
+        // --------------------------------------------------------
+        // TEST 4:
         // First beat spawns lane 0.
         // --------------------------------------------------------
 
         $display(
-            "TEST 2: deterministic lane spawn"
+            "TEST 4: deterministic lane spawn"
         );
 
 
@@ -610,7 +780,7 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 3:
+        // TEST 5:
         // Correct vowel too early must NOT score.
         //
         // lane 0 has just spawned and therefore should not yet be
@@ -618,7 +788,7 @@ module top_level_tb;
         // --------------------------------------------------------
 
         $display(
-            "TEST 3: early vowel does not score"
+            "TEST 5: early vowel does not score"
         );
 
 
@@ -658,12 +828,12 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 4:
+        // TEST 6:
         // Advance lane 0 until it reaches the hit window.
         // --------------------------------------------------------
 
         $display(
-            "TEST 4: lane reaches hit window"
+            "TEST 6: lane reaches hit window"
         );
 
 
@@ -688,14 +858,14 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 5:
+        // TEST 7:
         // Wrong vowel must not score.
         //
         // Use aw/lane 3 while lane 0 is the target.
         // --------------------------------------------------------
 
         $display(
-            "TEST 5: wrong vowel does not score"
+            "TEST 7: wrong vowel does not score"
         );
 
 
@@ -737,12 +907,12 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 6:
+        // TEST 8:
         // Correct ee event while lane 0 is in its hit window.
         // --------------------------------------------------------
 
         $display(
-            "TEST 6: correct vowel scores"
+            "TEST 8: correct vowel scores"
         );
 
 
@@ -759,12 +929,12 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 7:
+        // TEST 9:
         // A single classifier event must not repeatedly score.
         // --------------------------------------------------------
 
         $display(
-            "TEST 7: no duplicate scoring"
+            "TEST 9: no duplicate scoring"
         );
 
 
@@ -791,12 +961,12 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 8:
+        // TEST 10:
         // Game state crosses into the 25 MHz video domain.
         // --------------------------------------------------------
 
         $display(
-            "TEST 8: game-to-video CDC"
+            "TEST 10: game-to-video CDC"
         );
 
 
@@ -822,12 +992,12 @@ module top_level_tb;
 
 
         // --------------------------------------------------------
-        // TEST 9:
+        // TEST 11:
         // Full reset after activity clears game and propagates.
         // --------------------------------------------------------
 
         $display(
-            "TEST 9: reset after gameplay"
+            "TEST 11: reset after gameplay"
         );
 
 
@@ -893,7 +1063,7 @@ module top_level_tb;
 
     initial begin
 
-        #5_000_000;
+        #20_000_000;
 
         $fatal(
             1,

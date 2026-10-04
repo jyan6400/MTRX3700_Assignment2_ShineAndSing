@@ -1,6 +1,11 @@
 `timescale 1ns/1ps
 
-module top_level (
+module top_level #(
+    parameter int VIDEO_IMG_W = 320,
+    parameter int VIDEO_IMG_H = 240,
+    parameter int VIDEO_VGA_W = 640,
+    parameter int VIDEO_VGA_H = 480
+) (
     // ============================================================
     // DE1-SoC clock / controls
     // ============================================================
@@ -575,6 +580,7 @@ module top_level (
     // ============================================================
 
     localparam int VIDEO_NMAX = 32;
+    localparam int VIDEO_X_W  = $clog2(VIDEO_IMG_W);
 
 
     logic [29:0] video_data;
@@ -590,14 +596,18 @@ module top_level (
     logic [$clog2(VIDEO_NMAX+1)-1:0]
         boundary_count;
 
-    logic [VIDEO_NMAX-1:0][X_W-1:0]
+    logic [VIDEO_NMAX-1:0][VIDEO_X_W-1:0]
         boundary_x;
 
     logic lanes_valid;
 
 
     video_subsystem #(
-        .NMAX(VIDEO_NMAX)
+        .IMG_W (VIDEO_IMG_W),
+        .IMG_H (VIDEO_IMG_H),
+        .VGA_W (VIDEO_VGA_W),
+        .VGA_H (VIDEO_VGA_H),
+        .NMAX  (VIDEO_NMAX)
     ) u_video (
         .clk_50          (CLOCK_50),
         .reset_50        (reset_50),
