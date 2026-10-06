@@ -108,9 +108,9 @@ module video_subsystem #(
     parameter int    FLOOR_DEF  = 26,
     parameter int    KQ_DEF     = 102,
     parameter int    ABS_DEF    = 2048,
-    parameter string MIF0 = "memory/piano0.mif", HEX0 = "memory/piano0.hex",
-    parameter string MIF1 = "memory/piano1.mif", HEX1 = "memory/piano1.hex",
-    parameter string MIF2 = "memory/piano2.mif", HEX2 = "memory/piano2.hex"
+    parameter string MIF0 = "../memory/piano0.mif", HEX0 = "../memory/piano0.hex",
+    parameter string MIF1 = "../memory/piano1.mif", HEX1 = "../memory/piano1.hex",
+    parameter string MIF2 = "../memory/piano2.mif", HEX2 = "../memory/piano2.hex"
 ) (
     input  logic                     clk_50,
     input  logic                     reset_50,      // synchronous to clk_50, active high
