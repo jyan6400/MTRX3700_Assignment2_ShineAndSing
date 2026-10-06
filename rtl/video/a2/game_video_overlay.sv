@@ -264,19 +264,39 @@ module game_video_overlay #(
     // score: 5 digits at (8, 8) in the game view, on a dark box
     localparam int SP = 4 << SCORE_SH;                    // digit pitch
     logic [4:0] score_dot;
-    for (genvar d = 0; d < 5; d++) begin : g_score
-        assign score_dot[d] = glyph_on(x, y, SXW'(8 + d * SP), SYW'(8), f_bcd[(4-d)*4 +: 4], SCORE_SH);
-    end
+    genvar d_score;
+    generate
+        for (d_score = 0; d_score < 5; d_score = d_score + 1) begin : g_score
+            assign score_dot[d_score] = glyph_on(
+                x,
+                y,
+                SXW'(8 + d_score * SP),
+                SYW'(8),
+                f_bcd[(4-d_score)*4 +: 4],
+                SCORE_SH
+            );
+        end
+    endgenerate
     logic in_score_box;
     assign in_score_box = (int'(x) >= 4) && (int'(x) < 12 + 5 * SP) && (int'(y) >= 4) && (int'(y) < 12 + (5 << SCORE_SH));
     // lane labels: the vowel id, centred on each lane, at the bottom of the lit rows
     localparam int LD = 1 << HUD_SH;
     logic [3:0] label_dot;
-    for (genvar i = 0; i < 4; i++) begin : g_label
-        logic [SXW-1:0] lx;
-        assign lx = SXW'(((32'(f_l[i]) + 32'(f_r[i])) << SH) / 2 - (3 * LD) / 2);
-        assign label_dot[i] = glyph_on(x, y, lx, SYW'(((MASK_Y1 + 1) << SH) - 7 * LD), 4'(i), HUD_SH);
-    end
+    genvar i_label;
+    generate
+        for (i_label = 0; i_label < 4; i_label = i_label + 1) begin : g_label
+            logic [SXW-1:0] lx;
+            assign lx = SXW'(((32'(f_l[i_label]) + 32'(f_r[i_label])) << SH) / 2 - (3 * LD) / 2);
+            assign label_dot[i_label] = glyph_on(
+                x,
+                y,
+                lx,
+                SYW'(((MASK_Y1 + 1) << SH) - 7 * LD),
+                4'(i_label),
+                HUD_SH
+            );
+        end
+    endgenerate
     // readout in the debug views: mode, edge detector, boundaries (decimal)
     logic [3:0] bc_tens, bc_ones;
     assign bc_tens = 4'(32'(f_bcount) / 10);
@@ -287,9 +307,19 @@ module game_video_overlay #(
     assign hud_digit[1] = {3'b000, f_edge};
     assign hud_digit[2] = bc_tens;
     assign hud_digit[3] = bc_ones;
-    for (genvar d = 0; d < 4; d++) begin : g_hud
-        assign hud_dot[d] = glyph_on(x, y, SXW'(6 + d * 4 * LD + ((d >= 2) ? 2 * LD : 0)), SYW'(6), hud_digit[d], HUD_SH);
-    end
+    genvar d_hud;
+    generate
+        for (d_hud = 0; d_hud < 4; d_hud = d_hud + 1) begin : g_hud
+            assign hud_dot[d_hud] = glyph_on(
+                x,
+                y,
+                SXW'(6 + d_hud * 4 * LD + ((d_hud >= 2) ? 2 * LD : 0)),
+                SYW'(6),
+                hud_digit[d_hud],
+                HUD_SH
+            );
+        end
+    endgenerate
     logic in_hud_box;
     assign in_hud_box = (int'(x) >= 2) && (int'(x) < 10 + 18 * LD) && (int'(y) >= 2) && (int'(y) < 10 + 5 * LD);
 

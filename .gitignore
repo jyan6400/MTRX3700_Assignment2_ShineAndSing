@@ -1,4 +1,94 @@
+# ============================================================
+# Existing simulation / Verilator build outputs
+# ============================================================
+
 obj_dir/
 sim/audio/build/
 sim/video/build/
 sim/system/build/
+
+# ============================================================
+# Quartus generated build files
+# ============================================================
+
+quartus/db/
+quartus/incremental_db/
+quartus/output_files/
+quartus/simulation/
+quartus/.qsys_edit/
+
+# Quartus temporary / report files
+*.qws
+*.bak
+*.rpt
+*.summary
+*.smsg
+*.jdi
+*.sld
+
+# Quartus Programmer configuration
+*.cdf
+
+# ============================================================
+# ModelSim / simulation generated files
+# ============================================================
+
+work/
+transcript
+vsim.wlf
+*.wlf
+*.vcd
+*.fst
+
+# ============================================================
+# Verilator generated files
+# ============================================================
+
+*.d
+*.o
+*.a
+
+# ============================================================
+# Python generated files
+# ============================================================
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ============================================================
+# Editor / IDE files
+# ============================================================
+
+.vscode/
+.idea/
+
+# ============================================================
+# OS files
+# ============================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# Temporary files
+# ============================================================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ============================================================
+# Platform Designer generated files
+# ============================================================
+
+**/.qsys_edit/
+*.sopcinfo
+quartus/platform_designer/vga_sink/
+
+# Quartus diagnostic dumps
+quartus/c5_pin_model_dump.txt

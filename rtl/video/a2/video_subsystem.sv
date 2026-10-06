@@ -154,12 +154,15 @@ module video_subsystem #(
     // 50 MHz (analysis): picture, edge detector, mode, SW0;  25 MHz (display): picture, view
     logic [1:0] img50, img25, view_s, mode_s;
     logic       edge_s, sel_s;
-    for (genvar i = 0; i < 2; i++) begin : g_sync2
-        synchroniser u_img50 (.clk(clk_50), .x(sw_image[i]), .y(img50[i]));
-        synchroniser u_mode  (.clk(clk_50), .x(sw_mode[i]),  .y(mode_s[i]));
-        synchroniser u_img25 (.clk(clk_25), .x(sw_image[i]), .y(img25[i]));
-        synchroniser u_view  (.clk(clk_25), .x(sw_view[i]),  .y(view_s[i]));
-    end
+    genvar i_sync;
+    generate
+        for (i_sync = 0; i_sync < 2; i_sync = i_sync + 1) begin : g_sync2
+            synchroniser u_img50 (.clk(clk_50), .x(sw_image[i_sync]), .y(img50[i_sync]));
+            synchroniser u_mode  (.clk(clk_50), .x(sw_mode[i_sync]),  .y(mode_s[i_sync]));
+            synchroniser u_img25 (.clk(clk_25), .x(sw_image[i_sync]), .y(img25[i_sync]));
+            synchroniser u_view  (.clk(clk_25), .x(sw_view[i_sync]),  .y(view_s[i_sync]));
+        end
+    endgenerate
     synchroniser u_edge (.clk(clk_50), .x(sw_edge),   .y(edge_s));
     synchroniser u_sel  (.clk(clk_50), .x(sw_adjust), .y(sel_s));
 
@@ -180,9 +183,12 @@ module video_subsystem #(
     logic [NW-1:0] hi, lo, floor_lvl; logic [7:0] k_q; logic [AW-1:0] thr_abs;
 
     logic [3:1] kn_s, k_s;                            // keys: synchronised, then 1 = pressed
-    for (genvar i = 1; i <= 3; i++) begin : g_key
-        synchroniser u_key (.clk(clk_50), .x(key_n[i]), .y(kn_s[i]));
-    end
+    genvar i_key;
+    generate
+        for (i_key = 1; i_key <= 3; i_key = i_key + 1) begin : g_key
+            synchroniser u_key (.clk(clk_50), .x(key_n[i_key]), .y(kn_s[i_key]));
+        end
+    endgenerate
     assign k_s = ~kn_s;
 
     logic [$clog2(DB_TICKS):0] tick_cnt;              // slow sampling = debounce
