@@ -24,7 +24,9 @@
  *     unchanged (the CDC path), the lanes are the four middle kept keys, and each view is captured,
  *     checked and written as frame_<picture>_<view>.ppm (-> PNG):
  *        game      every lane is coloured from the game state latched for that frame (red in the hit
- *                  window, amber while a note counts down, faint blue when idle), the picture elsewhere
+ *                  window, amber while a note counts down, faint blue when idle), the picture elsewhere;
+ *                  the colour fills the real key: up between the black keys (row 100) but not on them,
+ *                  and not on the piano's frame above and below the keys
  *        edge map  bright on the kept boundaries, dark in the middle of the keys
  *        profile   the yellow bar is a peak at every kept boundary
  *        masks     the four lane colours inside the four lanes
@@ -356,10 +358,11 @@ module video_subsystem_tb;
     function automatic int d_l(int i); return int'(dut.d_l[i*XW +: XW]); endfunction
     function automatic int d_r(int i); return int'(dut.d_r[i*XW +: XW]); endfunction
 
-    // wait until a result made entirely with the current switches is on the screen
+    // wait until a result made entirely with the current switches is on the screen, and the overlay has
+    // had its two further frames to measure the keys' outlines
     task automatic settle();
         repeat (2) @(posedge clk50 iff boundary_valid);
-        repeat (3) next_frame();
+        repeat (5) next_frame();
     endtask
 
     // the display holds exactly what the key finder published (the CDC path)
@@ -374,6 +377,8 @@ module video_subsystem_tb;
             if (d_l(i) != int'(dut.res_lane_l[i*XW +: XW]) || d_r(i) != int'(dut.res_lane_r[i*XW +: XW])) $fatal(1, "FAIL: lane %0d differs across the CDC", i);
     endtask
 
+    function automatic bit is_grey(input logic [23:0] c); return (c[23:16] == c[15:8]) && (c[15:8] == c[7:0]); endfunction
+
     task automatic grab(input int view, input string name);
         sw_view = 2'(view);
         repeat (3) next_frame();                             // the view is latched per frame
@@ -387,14 +392,20 @@ module video_subsystem_tb;
         // game view: every lane coloured from the snapshot of the frame shown
         grab(0, $sformatf("p%0d_view0_game", p));
         for (int i = 0; i < 4; i++) begin
-            logic [23:0] c; int x;
-            x = d_l(i) + 2; c = cap[sy][x];
+            logic [23:0] c; int x, lit, dark;
+            x = (d_l(i) + d_r(i)) / 2; c = cap[sy][x];           // the middle of the key, in the analysed rows
             if (shown.flash[i] > 0)    begin if (c[15:8] != 8'd255)                        $fatal(1, "FAIL: lane %0d should flash green: %06h", i, c); end
             else if (shown.window[i])  begin if (c[23:16] != 8'd255 || c[15:8] > 8'd40)     $fatal(1, "FAIL: lane %0d should be red: %06h", i, c); end
             else if (shown.active[i])  begin if (c[7:0] != 8'd0 || c[23:16] <= c[15:8])      $fatal(1, "FAIL: lane %0d should be amber: %06h", i, c); end
             else                       begin if (c[7:0] <= c[23:16])                         $fatal(1, "FAIL: lane %0d should be tinted blue: %06h", i, c); end
+            // the colour is the shape of the key: at row 100 (between the black keys) the middle of the key
+            // is coloured and the black key beside it is not; the frame above and below the keys is not
+            if (is_grey(cap[100][x])) $fatal(1, "FAIL: lane %0d: the key is not coloured up between the black keys (row 100)", i);
+            lit = 0; dark = 0;
+            for (int xx = d_l(i) + 1; xx < d_r(i); xx++) if (is_grey(cap[100][xx])) dark++; else lit++;
+            if (lit < 6 || dark < 3) $fatal(1, "FAIL: lane %0d at row 100: %0d coloured and %0d uncoloured columns -- not the shape of a key beside a black key", i, lit, dark);
+            if (!is_grey(cap[2][x]) || !is_grey(cap[H - 8][x])) $fatal(1, "FAIL: lane %0d: colour outside the key (rows 2 / %0d)", i, H - 8);   // (row 2: above the score box)
         end
-        if (cap[Y0 - 20][d_l(0) + 2][23:16] != cap[Y0 - 20][d_l(0) + 2][7:0]) $fatal(1, "FAIL: the picture above the lanes is not grey");
         // edge map: a kept boundary column is bright in the key rows, a key centre is dark
         grab(1, $sformatf("p%0d_view1_edges", p));
         begin
@@ -426,7 +437,10 @@ module video_subsystem_tb;
         begin
             logic [23:0] lc [4];
             lc[0] = 24'hE63C3C; lc[1] = 24'h3CC83C; lc[2] = 24'h466EFF; lc[3] = 24'hF0DC28;
-            for (int i = 0; i < 4; i++) if (cap[sy][(d_l(i) + d_r(i)) / 2 + 1] != lc[i]) $fatal(1, "FAIL: mask %0d colour %06h", i, cap[sy][(d_l(i) + d_r(i)) / 2 + 1]);
+            for (int i = 0; i < 4; i++) begin
+                if (cap[sy][(d_l(i) + d_r(i)) / 2 + 1] != lc[i]) $fatal(1, "FAIL: mask %0d colour %06h", i, cap[sy][(d_l(i) + d_r(i)) / 2 + 1]);
+                if (cap[100][(d_l(i) + d_r(i)) / 2] != lc[i])    $fatal(1, "FAIL: mask %0d is not the whole key (row 100)", i);
+            end
         end
         sw_view = 0;
     endtask
@@ -514,7 +528,7 @@ module video_subsystem_tb;
             next_frame();
             for (int i = 0; i < 4; i++) begin
                 logic [23:0] c;
-                c = cap[Y0 + 1][d_l(i) + 2];
+                c = cap[Y0 + 1][(d_l(i) + d_r(i)) / 2];
                 if (shown.flash[i] > 0) begin
                     if (c[15:8] != 8'd255) $fatal(1, "FAIL: frame %0d lane %0d should flash green", frames_done, i);
                     if (green_seen == 0) write_ppm("p2_view0_game_hit");

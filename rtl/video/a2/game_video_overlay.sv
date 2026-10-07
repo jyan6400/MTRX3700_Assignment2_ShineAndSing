@@ -8,15 +8,33 @@
  *    0  the game   the picture; each of the four lanes (the white keys key_mask_generator chose) is
  *                  lit from the game state: a note darkens its key to amber and brightens it as
  *                  lane_count counts down; the hit window turns the key red; a hit flashes it green
- *                  for FLASH_FRAMES frames; an idle lane has a faint blue tint. The vowel id (0 ee,
+ *                  for FLASH_FRAMES frames; an idle lane has a faint blue tint. The colour fills the
+ *                  WHOLE KEY, in its real shape (see "the shape of a key" below). The vowel id (0 ee,
  *                  1 ah, 2 oo, 3 aw) is written on each lane, the score top-left (5 decimal digits).
  *    1  edge map   brightness = the selected edge detector's strength (the analysis side writes it)
  *    2  profile    the normalised column profile as yellow bars, the high threshold in red and the low
  *                  one in orange (at R-V4 these are the local-average curves; at R-V1/R-V2 the single
  *                  absolute threshold), and every detected boundary as a vertical line: green when the
  *                  lattice fit kept it, magenta when it was dropped
- *    3  key masks  the four lanes in four colours on a dim picture, boundaries as in view 2
+ *    3  key masks  the four keys in four colours on a dim picture, boundaries as in view 2
  *  Views 1..3 carry a small readout top-left: mode, edge detector, number of boundaries.
+ *
+ *  THE SHAPE OF A KEY (KEY_SHAPE = 1). The key finder gives each lane's left and right boundary
+ *  (columns); the rest of the key's outline is read here from the picture itself, as it is displayed:
+ *    white level   the mean of 8 pixels down the lane's centre column in the middle of the analysed
+ *                  rows (MASK_Y0..MASK_Y1 are white key by construction)
+ *    "key white"   a pixel at least 5/8 as bright as that level (a black key, the gap between two
+ *                  keys and the piano's frame are all far darker; 5/8 leaves room for a lighting
+ *                  gradient across the key and for noise)
+ *    top, bottom   going down the centre column, the first and last row of the unbroken run of
+ *                  key-white pixels that passes through the analysed rows
+ *    the key       every key-white pixel between the lane's two boundaries and between top and bottom
+ *  So the colour follows the key round the black keys and stops at the gaps and at the key's two ends,
+ *  and nothing about the keys is typed in. The white level is measured during one frame and used in
+ *  the next, the top and bottom are found during that frame and used in the one after (the picture is
+ *  static, so the frames are identical). For the first two frames after the lanes change -- and
+ *  whenever no such run is found -- the lane is drawn as before: the plain band of rows
+ *  MASK_Y0..MASK_Y1. KEY_SHAPE = 0 keeps the band always.
  *
  *  Clock / reset: the 25 MHz pixel clock, synchronous active-high reset. Everything that comes in
  *  here is already in this clock domain: the analysis results through cdc_latch, the game state
@@ -45,8 +63,9 @@ module game_video_overlay #(
     parameter int NMAX         = 32,
     parameter int NW           = 9,
     parameter int GAME_COUNT_W = assignment2_pkg::GAME_COUNT_W,
-    parameter int MASK_Y0      = 150,      // picture rows the lanes are drawn over (the profile's rows:
-    parameter int MASK_Y1      = 176,      //  the white keys below the black ones)
+    parameter int MASK_Y0      = 150,      // the analysed rows (the profile's rows: white keys below the
+    parameter int MASK_Y1      = 176,      //  black ones); at least 8 of them
+    parameter int KEY_SHAPE    = 1,        // 1: colour the whole key in its real shape; 0: only those rows
     parameter int FLASH_FRAMES = 8,
     parameter int SCORE_SH     = 2,        // score digits: 3x5 dots of 4x4 pixels
     parameter int HUD_SH       = 1         // readout digits in the debug views
@@ -177,12 +196,96 @@ module game_video_overlay #(
         end
     end
 
+    // ------------------------------------------------------------------ the shape of each lane's key
+    localparam int YW     = $clog2(H);
+    localparam int YM     = (MASK_Y0 + MASK_Y1) / 2;      // the middle analysed row: certainly white key
+    localparam int REF_Y0 = YM - 4;                       // the 8 rows whose mean is the key's white level
+
+    // frame registers: what the frame being drawn uses
+    logic [7:0]    f_ref [0:3];                           // white level
+    logic [YW-1:0] f_top [0:3], f_bot [0:3];              // first and last row of the key
+    logic [3:0]    f_shape;                               // top/bottom were found
+    logic [1:0]    f_age;                                 // frames since the lanes last changed, up to 2
+
+    // is the presented pixel "key white" for lane i:  grey >= 5/8 of the lane's white level
+    logic [3:0] key_white;
+    always_comb for (int i = 0; i < 4; i++)
+        key_white[i] = ({grey, 3'b000} >= (11'(f_ref[i]) * 11'd5));
+
+    // measured during the frame, down the centre column of each lane: one sample per picture pixel
+    // (the first screen pixel of its 2^SH x 2^SH block), taken when that pixel is accepted
+    logic [XW-1:0] lane_c [0:3];
+    logic          block_first;
+    logic [3:0]    at_c;
+    assign block_first = ((int'(x) & ((1 << SH) - 1)) == 0) && ((int'(y) & ((1 << SH) - 1)) == 0);
+    always_comb for (int i = 0; i < 4; i++) begin
+        lane_c[i] = XW'((32'(f_l[i]) + 32'(f_r[i])) >> 1);
+        at_c[i]   = adv && block_first && (cx == lane_c[i]);
+    end
+    logic [10:0]   m_sum [0:3];                           // sum of the 8 white-level pixels
+    logic [3:0]    m_run, m_seen, m_done, m_found;        // in a run / the run reached row YM / finished / found
+    logic [YW-1:0] m_start [0:3], m_top [0:3], m_bot [0:3];
+
+    logic lanes_changed;                                  // the result being latched has other lanes
+    always_comb begin
+        lanes_changed = (res_lanes_valid != f_lanes_valid);
+        for (int i = 0; i < 4; i++)
+            if ((res_lane_l[i*XW +: XW] != f_l[i]) || (res_lane_r[i*XW +: XW] != f_r[i])) lanes_changed = 1'b1;
+    end
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            f_age <= '0; f_shape <= '0; m_run <= '0; m_seen <= '0; m_done <= '0; m_found <= '0;
+            for (int i = 0; i < 4; i++) begin
+                f_ref[i] <= '0; f_top[i] <= '0; f_bot[i] <= '0;
+                m_sum[i] <= '0; m_start[i] <= '0; m_top[i] <= '0; m_bot[i] <= '0;
+            end
+        end else if (frame_latch) begin
+            // the frame is complete: its measurements become the next frame's registers
+            f_age <= lanes_changed ? 2'd0 : (f_age == 2'd2) ? 2'd2 : f_age + 2'd1;
+            for (int i = 0; i < 4; i++) begin
+                f_ref[i] <= m_sum[i][10:3];
+                if (m_found[i]) begin                                   // the run ended inside the picture
+                    f_top[i] <= m_top[i];   f_bot[i] <= m_bot[i];   f_shape[i] <= 1'b1;
+                end else if (!m_done[i] && m_seen[i] && m_run[i]) begin // the run reaches the last row
+                    f_top[i] <= m_start[i]; f_bot[i] <= YW'(H - 1); f_shape[i] <= 1'b1;
+                end else
+                    f_shape[i] <= 1'b0;
+                m_sum[i] <= '0;
+            end
+            m_run <= '0; m_seen <= '0; m_done <= '0; m_found <= '0;
+        end else begin
+            for (int i = 0; i < 4; i++) if (at_c[i]) begin
+                if ((int'(cy) >= REF_Y0) && (int'(cy) < REF_Y0 + 8)) m_sum[i] <= m_sum[i] + 11'(grey);
+                if (!m_done[i]) begin
+                    if (key_white[i]) begin
+                        if (!m_run[i]) begin m_start[i] <= cy; m_run[i] <= 1'b1; end
+                        if (int'(cy) == YM) m_seen[i] <= 1'b1;
+                    end else begin
+                        if (m_run[i] && m_seen[i]) begin                // the run through row YM ends here
+                            m_top[i] <= m_start[i]; m_bot[i] <= cy - 1'b1; m_found[i] <= 1'b1; m_done[i] <= 1'b1;
+                        end else if (int'(cy) == YM)                    // row YM itself is not white: no shape
+                            m_done[i] <= 1'b1;
+                        m_run[i] <= 1'b0;
+                    end
+                end
+            end
+        end
+    end
+
     // ------------------------------------------------------------------ what is under the presented pixel
     logic in_rows;
     assign in_rows = (int'(cy) >= MASK_Y0) && (int'(cy) <= MASK_Y1);
     logic [3:0] in_lane;
-    always_comb for (int i = 0; i < 4; i++)
-        in_lane[i] = f_lanes_valid && in_rows && (cx > f_l[i]) && (cx < f_r[i]);
+    always_comb for (int i = 0; i < 4; i++) begin
+        in_lane[i] = 1'b0;
+        if (f_lanes_valid && (cx > f_l[i]) && (cx < f_r[i])) begin
+            if ((KEY_SHAPE != 0) && (f_age == 2'd2) && f_shape[i])
+                in_lane[i] = (cy >= f_top[i]) && (cy <= f_bot[i]) && key_white[i];     // the key itself
+            else
+                in_lane[i] = in_rows;                                                    // the plain band
+        end
+    end
 
     logic on_bound, on_kept;
     always_comb begin

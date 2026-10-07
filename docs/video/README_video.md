@@ -93,7 +93,10 @@ video_pll video_pll_u (.refclk(CLOCK_50), .rst(1'b0), .outclk_0(clk_25), .locked
 * `lane_count` is the contract's `logic [GAME_COUNT_W-1:0] lane_count [0:3]`; a lower count = closer to the
   hit window = brighter key. **Tell me if your countdown runs the other way.**
 * The game view reads only the frozen Game → Video signals; nothing about the FSM.
-* Quartus lines (files, qsys, MIFs, search paths, SDC notes): `quartus/video_subsystem_files.qsf`.
+* Quartus lines (files, qsys, MIFs, SDC notes): now in Jason's `quartus/assignment2.qsf`.
+* The pictures: `video_subsystem`'s `MIF0..2` default to `"../memory/pianoN.mif"` (Quartus looks from the
+  project folder `quartus/`; a `.mif` it cannot find is only a Critical Warning and gives a black picture)
+  and `HEX0..2` to `"memory/pianoN.hex"` (the benches run from the repository root).
 * Sizes come from `rtl/common/assignment2_pkg.sv`: `video_subsystem`'s parameters are named and defaulted
   from it (`IMG_W`, `IMG_H`, `VGA_W`, `VGA_H`, `GAME_COUNT_W`; the `score` port is `SCORE_W` bits), so
   top_level needs no parameter overrides. The package must be compiled before the video files (first in
@@ -120,7 +123,7 @@ video_pll video_pll_u (.refclk(CLOCK_50), .rst(1'b0), .outclk_0(clk_25), .locked
 | SW7..SW6 | 0 = R-V4 (default), 1 = R-V3, 2 or 3 = R-V1/R-V2 (with SW5 = 0 that is R-V1, with SW5 = 1 R-V2) |
 | KEY1 / KEY2 | raise / lower the value SW0 selects: R-V3 hi (SW0=0) / lo (SW0=1), step 8/256; R-V4 k (SW0=0, steps of 0.2) / floor (SW0=1, steps of 4/256); R-V1/R-V2 the absolute threshold (step 256) |
 | KEY3 | restore every default |
-| VGA, game view | lanes lit from the game state (amber note brightening as lane_count falls, red hit window, green flash on a hit, faint blue idle), vowel id on each lane, score top-left (5 digits), red square top-right if no lanes were found |
+| VGA, game view | the four keys, each coloured over its whole real shape (round the black keys, from the top of the key to its bottom) from the game state (amber note brightening as lane_count falls, red hit window, green flash on a hit, faint blue idle), vowel id on each lane, score top-left (5 digits), red square top-right if no lanes were found |
 | VGA, debug views | top-left: mode, edge detector, number of boundaries. Profile view: yellow = normalised profile, red = high threshold (the local-average curve at R-V4), orange = low threshold, green lines = kept boundaries, magenta = dropped by the lattice |
 
 ## 4. Design decisions (for the report)
@@ -128,7 +131,17 @@ video_pll video_pll_u (.refclk(CLOCK_50), .rst(1'b0), .outclk_0(clk_25), .locked
 * **Rows 150..176** (`Y0`, `Y1`): below the black keys, where each white-key gap is a clean pair of edges, in
   *both* supplied pictures — picture 1's black keys end at row 147 and its white keys at 217; picture 2
   (letterboxed) has black keys to row 137 and white keys only to row 179, with the dark frame below. One
-  row of margin each side for the 3×3 windows. The lanes are drawn over the same rows.
+  row of margin each side for the 3×3 windows.
+* **The colour fills the real key, not a box** (`game_video_overlay`, `KEY_SHAPE = 1`). The key finder gives
+  each lane's left and right boundary; the rest of the outline is read from the displayed picture: the key's
+  white level is the mean of 8 pixels down its centre column in the analysed rows; a pixel is "key white" if
+  it is at least 5/8 of that (black keys, gaps and the frame are far darker; 3/4 was tried in the Python
+  prototype and broke on the photo-like picture's gradient and noise, 5/8 held on all three); the key's top
+  and bottom are the ends of the unbroken key-white run down the centre column through the analysed rows; the
+  key is every key-white pixel between its two boundaries and between top and bottom. Measured one frame,
+  used the next (the picture is static): the first two frames after the lanes change, or a lane where no run
+  is found, show the plain band of rows 150..176 as before. Nothing about the keys is typed in. Cost: a few
+  registers and comparators per lane, no memory.
 * **Normalise by the maximum** (R-V3): every threshold becomes a fraction, independent of picture brightness and
   of the detector (Sobel's 1-2-1 weights give 4× the 1-D difference). 0.45 / 0.25 (115 / 64 of 256) read both
   supplied pictures. Picture 1's boundaries range from 0.48 to 1.0 of the strongest, so the earlier 0.70 / 0.35
@@ -208,8 +221,8 @@ New: `profile_normalise`, `hysteresis_profile`, `local_threshold`, `key_mask_gen
 | `local_threshold_tb` | window ends, spike, step (shadow), saturation, k = 0, 50 random |
 | `hysteresis_profile_tb` | strong / weak-beside-strong / lone weak / false peaks below lo / plateau; adaptive shadowed half; overflow; 300 random |
 | `key_mask_generator_tb` | lattice, shadow edge, missed boundary, too few keys, fixed `lane_first`, middle keys on both supplied pictures' lists; 300 random lists |
-| `game_video_overlay_tb` | 24 frames into the VGA monitor model with 20 % stalls: 0 protocol errors; lane colours from the latched game state; the digit font — every pixel of the score with all ten digits, the vowel id on each lane, the debug readout; no-keys marker; every debug view; game state and view changed mid-frame; hit flash; reset mid-frame |
-| `video_subsystem_tb` | the integrated path as top_level uses it, two asynchronous clocks, mock game. **Key finder, exact:** every rung × both detectors × three pictures against a reference the bench computes from the pixels (boundaries, kept flags, spacing, lanes, every profile-view column, every edge-map pixel swept, no detector output outside the valid picture) — this covers the 1-D detector, the rung selection and the latency/coordinates. **Against the truth:** every rung reads both supplied pictures, only R-V4 the photo-like one. **Display:** the CDC copy, four views per picture checked and saved as PNG. **Thresholds:** bounced and held presses = one step, SW0/mode selection, clamps, KEY3, and results with moved thresholds exact. **Play and reset:** hits drawn, reset of both domains mid-frame; 0 protocol problems |
+| `game_video_overlay_tb` | 24 frames into the VGA monitor model with 20 % stalls: 0 protocol errors; lane colours from the latched game state; **the key shape** — the mock picture is a small keyboard and the bench's own outline of each key is compared at 12 pixels per lane (on the key beside a black key, on the black key, below the analysed rows, on the gap, in the frame, on bright patches above and touching the key, on a mid-grey smudge), with the plain band expected for the first two frames after the lanes change; the digit font — every pixel of the score with all ten digits, the vowel id on each lane, the debug readout; no-keys marker; every debug view; game state and view changed mid-frame; hit flash; reset mid-frame |
+| `video_subsystem_tb` | the integrated path as top_level uses it, two asynchronous clocks, mock game. **Key finder, exact:** every rung × both detectors × three pictures against a reference the bench computes from the pixels (boundaries, kept flags, spacing, lanes, every profile-view column, every edge-map pixel swept, no detector output outside the valid picture) — this covers the 1-D detector, the rung selection and the latency/coordinates. **Against the truth:** every rung reads both supplied pictures, only R-V4 the photo-like one. **Display:** the CDC copy, four views per picture checked and saved as PNG; in the game and mask views the colour must run up the key between the black keys (row 100), miss the black key beside it, and stay off the frame above and below. **Thresholds:** bounced and held presses = one step, SW0/mode selection, clamps, KEY3, and results with moved thresholds exact. **Play and reset:** hits drawn, reset of both domains mid-frame; 0 protocol problems |
 
 The checks of the modules that were folded in (1-D detector, digit font, threshold keys, key finder) moved
 into the last two benches; five deliberate faults in `video_subsystem.sv` (no left-neighbour check, no

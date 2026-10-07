@@ -38,8 +38,8 @@
  *
  *  ROWS Y0..Y1 = 150..176: below the black keys and above the bottom of the white keys in BOTH supplied
  *  pictures (picture 1's white keys run to row 216, picture 2's -- letterboxed -- only to row 179,
- *  under which is the dark frame), with a row of margin for the 3x3 windows. The overlay draws the
- *  lanes over the same rows.
+ *  under which is the dark frame), with a row of margin for the 3x3 windows. The overlay takes each
+ *  key's white level from the same rows and colours the whole key from there (game_video_overlay.sv).
  *
  *  LATENCY / POSITIONS: every convolution stage carries the CENTRE coordinates of its output with the
  *  value (conv3x3's out_x/out_y), so the column profile is indexed by the true picture column whatever
@@ -108,9 +108,13 @@ module video_subsystem #(
     parameter int    FLOOR_DEF  = 26,
     parameter int    KQ_DEF     = 102,
     parameter int    ABS_DEF    = 2048,
-    parameter string MIF0 = "../memory/piano0.mif", HEX0 = "../memory/piano0.hex",
-    parameter string MIF1 = "../memory/piano1.mif", HEX1 = "../memory/piano1.hex",
-    parameter string MIF2 = "../memory/piano2.mif", HEX2 = "../memory/piano2.hex"
+    parameter int    KEY_SHAPE  = 1,       // 1: colour the whole key in its real shape; 0: only rows Y0..Y1
+    // The pictures. Quartus loads the .mif and looks for it from the PROJECT folder (quartus/), hence
+    // "../memory/..."; a .mif it cannot find is only a Critical Warning and gives a BLACK picture.
+    // Simulators load the .hex and are run from the repository root, hence "memory/...".
+    parameter string MIF0 = "../memory/piano0.mif", HEX0 = "memory/piano0.hex",
+    parameter string MIF1 = "../memory/piano1.mif", HEX1 = "memory/piano1.hex",
+    parameter string MIF2 = "../memory/piano2.mif", HEX2 = "memory/piano2.hex"
 ) (
     input  logic                     clk_50,
     input  logic                     reset_50,      // synchronous to clk_50, active high
@@ -492,7 +496,7 @@ module video_subsystem #(
 
     // ================================================================== 25 MHz: the picture on the monitor
     game_video_overlay #(.H_RES(H_RES), .V_RES(V_RES), .W(W), .H(H), .SH(SH), .NMAX(NMAX), .NW(NW),
-                         .GAME_COUNT_W(GAME_COUNT_W), .MASK_Y0(Y0), .MASK_Y1(Y1)) u_overlay (
+                         .GAME_COUNT_W(GAME_COUNT_W), .MASK_Y0(Y0), .MASK_Y1(Y1), .KEY_SHAPE(KEY_SHAPE)) u_overlay (
         .clk(clk_25), .reset(reset_25), .view_sel(view_s),
         .src_addr(rb_addr), .grey(rb_q), .edge4(edge_q), .prof_x(prof_rx), .prof_data(prof_q),
         .res_bcount(d_bcount), .res_bounds(d_bounds), .res_kept(d_kept), .res_lanes_valid(d_lanes_valid),

@@ -11,6 +11,13 @@
  *                idle tint, a note's amber brightening with lane_count, red in the hit window, green for
  *                FLASH_FRAMES frames after a hit pulse; the picture untouched outside the lanes; the
  *                "no keys" marker when lanes_valid = 0
+ *    key shape   the mocked picture is a small keyboard (white keys, dark gaps, black keys over some
+ *                gaps, a dark frame above and below, one bright patch in the frame). The bench works
+ *                out each lane's key itself -- white level, top and bottom down the centre column, the
+ *                5/8 rule -- and checks that the colour is on the key and nowhere else: beside a black
+ *                key yes, on the black key no, below the analysed rows yes, on the gap, in the frame and
+ *                on the bright patch above the key no. For the first two frames after the lanes change
+ *                the plain band of analysed rows must be drawn instead.
  *    digits      the overlay's own 3x5 dot font: every pixel of every dot of the 5-digit score, with
  *                scores that between them show all ten digits; the vowel id written on each lane; the
  *                readout digits in the debug views
@@ -29,7 +36,27 @@ module game_video_overlay_tb;
     logic reset = 1;
 
     // ---- mocked memories (one clock of read latency, like the M10Ks) ----
-    function automatic int grey_at(int sx, int sy);   return ((sx * 3 + sy * 5) & 8'hFF) | 8'h40; endfunction
+    // the picture: a small keyboard. Rows 6..41 are keys (white 200..215, a dark gap every 8 columns,
+    // black keys in rows 6..18 two columns either side of the gaps at 16, 32 and 48); rows 0..5 and
+    // 42..47 are the dark frame. Three things to catch a wrong outline: a bright patch in the frame above
+    // lane 3's key (columns 46..47, rows 1..3), one touching the bottom of that key (columns 41..42, rows
+    // 42..44), and a mid-grey smudge on lane 2's key (columns 38..39, rows 36..38: under 5/8 of white).
+    function automatic bit black_at(int sx);
+        int m, gcol;
+        m = sx % 8;
+        if (m >= 1 && m <= 2)      gcol = sx - m;
+        else if (m >= 6)           gcol = sx + 8 - m;
+        else                       return 0;
+        return (gcol == 16) || (gcol == 32) || (gcol == 48);
+    endfunction
+    function automatic int grey_at(int sx, int sy);
+        if (sy < 6)                    return (sx >= 46 && sx <= 47 && sy >= 1 && sy <= 3) ? 250 : 20 + ((sx + sy) & 7);
+        if (sy > 41)                   return (sx >= 41 && sx <= 42 && sy <= 44) ? 250 : 30 + ((sx * 3 + sy) & 7);
+        if (sx % 8 == 0)               return 40;
+        if (sx >= 38 && sx <= 39 && sy >= 36 && sy <= 38) return 100;
+        if (sy <= 18 && black_at(sx))  return 12 + (sy & 3);
+        return 200 + ((sx * 3 + sy * 5) & 15);
+    endfunction
     function automatic int edge_at(int sx, int sy);   return (sx ^ sy) & 15; endfunction
     function automatic int n_at(int sx);              return (sx * 7) % 200; endfunction
     function automatic int hi_at(int sx);             return 150 + (sx % 5); endfunction
@@ -76,16 +103,21 @@ module game_video_overlay_tb;
     always @(posedge clk) if (!reset && vblank != sop) $fatal(1, "FAIL: vblank must mean 'presenting pixel (0,0)'");
 
     // ---- the bench's model of the frame registers: a snapshot at every frame_latch ----
-    typedef struct { int view; bit lanes; bit active [4]; bit window [4]; int count [4]; int flash [4]; int score; } snap_t;
+    typedef struct { int view; bit lanes; int age; bit active [4]; bit window [4]; int count [4]; int flash [4]; int score; } snap_t;
     snap_t cur, snaps[$];
     bit hit_seen [4];
+    bit lanes_loaded;                 // the lane positions have been latched since the reset
     task automatic reset_model();
-        cur.view = 0; cur.lanes = 0; cur.score = 0;
+        cur.view = 0; cur.lanes = 0; cur.score = 0; cur.age = 0; lanes_loaded = 0;
         for (int i = 0; i < 4; i++) begin cur.active[i] = 0; cur.window[i] = 0; cur.count[i] = 0; cur.flash[i] = 0; hit_seen[i] = 0; end
         snaps.delete(); snaps.push_back(cur);
     endtask
     always @(posedge clk) if (!reset) begin
         if (frame_latch) begin
+            // frames since the lanes last changed (the positions themselves change once, after a reset)
+            if ((res_lanes_valid != cur.lanes) || !lanes_loaded) cur.age = 0;
+            else if (cur.age < 2) cur.age++;
+            lanes_loaded = 1;
             cur.view = int'(view_sel); cur.lanes = res_lanes_valid; cur.score = int'(score);
             for (int i = 0; i < 4; i++) begin
                 cur.active[i] = lane_active[i]; cur.window[i] = lane_hit_window[i]; cur.count[i] = int'(lane_count[i]);
@@ -104,6 +136,49 @@ module game_video_overlay_tb;
     function automatic logic [23:0] rgb(int r, int g, int b); return {8'(r), 8'(g), 8'(b)}; endfunction
     function automatic int sat8(int v); return (v > 255) ? 255 : (v < 0) ? 0 : v; endfunction
 
+    // ---- the bench's own idea of each lane's key ----
+    localparam int YM = (MY0 + MY1) / 2;
+    int k_ref [4], k_top [4], k_bot [4]; bit k_ok [4];
+    function automatic bit white_for(int i, int sx, int sy); return grey_at(sx, sy) * 8 >= k_ref[i] * 5; endfunction
+    task automatic find_keys();
+        for (int i = 0; i < 4; i++) begin
+            int c, sum, start; bit run, seen, fin;
+            c = (ll[i] + lr[i]) / 2; sum = 0;
+            for (int yy = YM - 4; yy < YM + 4; yy++) sum += grey_at(c, yy);
+            k_ref[i] = sum / 8;
+            run = 0; seen = 0; fin = 0; start = 0; k_ok[i] = 0;
+            for (int yy = 0; yy < H && !fin; yy++) begin
+                if (white_for(i, c, yy)) begin
+                    if (!run) begin start = yy; run = 1; end
+                    if (yy == YM) seen = 1;
+                end else begin
+                    if (run && seen) begin k_top[i] = start; k_bot[i] = yy - 1; k_ok[i] = 1; fin = 1; end
+                    else if (yy == YM) fin = 1;
+                    run = 0;
+                end
+            end
+            if (!fin && run && seen) begin k_top[i] = start; k_bot[i] = H - 1; k_ok[i] = 1; end
+        end
+    endtask
+    // is picture pixel (sx, sy) drawn as lane i in a frame with snapshot s?
+    function automatic bit in_key(snap_t s, int i, int sx, int sy);
+        if (!s.lanes || sx <= ll[i] || sx >= lr[i]) return 0;
+        if (s.age == 2 && k_ok[i]) return (sy >= k_top[i]) && (sy <= k_bot[i]) && white_for(i, sx, sy);
+        return (sy >= MY0) && (sy <= MY1);
+    endfunction
+    // the colour of picture pixel (sx, sy) in the game view (away from the score, labels and marker)
+    function automatic logic [23:0] game_px(snap_t s, int sx, int sy);
+        int gr, lvl;
+        gr = grey_at(sx, sy);
+        for (int i = 0; i < 4; i++) if (in_key(s, i, sx, sy)) begin
+            if (s.flash[i] > 0)   return rgb(gr >> 2, 255, gr >> 2);
+            if (s.window[i])      return rgb(255, gr >> 3, gr >> 3);
+            if (s.active[i]) begin lvl = CMAX - s.count[i]; return rgb(sat8(64 + lvl * 180 / CMAX), sat8(40 + lvl * 150 / CMAX), 0); end
+            return rgb(gr - (gr >> 3), gr - (gr >> 3), gr);
+        end
+        return rgb(gr, gr, gr);
+    endfunction
+
     int nfail = 0;
     task automatic expect_px(input int x, input int y, input logic [23:0] want, input string what);
         if (cap[y][x] !== want)
@@ -117,15 +192,32 @@ module game_video_overlay_tb;
         case (s.view)
             0: begin
                 for (int i = 0; i < 4; i++) begin
-                    int sx, gr, lvl; logic [23:0] want;
-                    sx = ll[i] + 2; gr = grey_at(sx, sy);
-                    if (!s.lanes)             want = rgb(gr, gr, gr);
-                    else if (s.flash[i] > 0)  want = rgb(gr >> 2, 255, gr >> 2);
-                    else if (s.window[i])     want = rgb(255, gr >> 3, gr >> 3);
-                    else if (s.active[i]) begin lvl = CMAX - s.count[i]; want = rgb(sat8(64 + lvl * 180 / CMAX), sat8(40 + lvl * 150 / CMAX), 0); end
-                    else                      want = rgb(gr - (gr >> 3), gr - (gr >> 3), gr);
-                    expect_px(sx << SH, sy << SH, want, $sformatf("lane %0d", i));
-                    expect_px((sx << SH) + 1, (sy << SH) + 1, want, $sformatf("lane %0d (2x2 block)", i));
+                    int c; int px [12][2];
+                    c = (ll[i] + lr[i]) / 2;
+                    px[0] = '{c, sy};               // the analysed rows, centre of the key
+                    px[1] = '{ll[i] + 3, sy};       // the analysed rows, towards the left edge
+                    px[2] = '{c, 17};               // beside a black key: key when the shape is drawn
+                    px[3] = '{ll[i] + 1, 17};       // lanes 0 and 2: on the black key itself
+                    px[4] = '{lr[i] - 1, 17};       // lanes 1 and 3: on the black key itself
+                    px[5] = '{c, 39};               // below the analysed rows, still on the key
+                    px[6] = '{c, 44};               // the frame under the keys
+                    px[7] = '{ll[i], sy};           // the gap on the lane's left boundary
+                    px[8] = '{46, 2};               // the bright patch above lane 3's key
+                    px[9] = '{41, 42};              // the bright patch touching the bottom of lane 3's key
+                    px[10] = '{38, 37};             // the mid-grey smudge on lane 2's key: not key white
+                    px[11] = '{37, 37};             //  ... and the white pixel next to it
+                    foreach (px[k]) begin
+                        expect_px(px[k][0] << SH, px[k][1] << SH, game_px(s, px[k][0], px[k][1]), $sformatf("lane %0d, probe %0d (age %0d)", i, k, s.age));
+                        expect_px((px[k][0] << SH) + 1, (px[k][1] << SH) + 1, game_px(s, px[k][0], px[k][1]), $sformatf("lane %0d, probe %0d (2x2 block)", i, k));
+                    end
+                    // the model itself must say what the picture was built to show
+                    if (s.lanes && s.age == 2) begin
+                        if (!in_key(s, i, c, 17) || !in_key(s, i, c, 39) || in_key(s, i, c, 44) || in_key(s, i, c, 5))
+                            $fatal(1, "FAIL: bench key model, lane %0d: top %0d bottom %0d", i, k_top[i], k_bot[i]);
+                        if (in_key(s, i, (i % 2 == 0) ? ll[i] + 1 : lr[i] - 1, 17)) $fatal(1, "FAIL: bench key model colours a black key");
+                        if (in_key(s, 3, 46, 2) || in_key(s, 3, 41, 42)) $fatal(1, "FAIL: bench key model colours a patch outside the key");
+                        if (in_key(s, 2, 38, 37) || !in_key(s, 2, 37, 37)) $fatal(1, "FAIL: bench key model and the mid-grey smudge");
+                    end
                 end
                 begin int sx; sx = ll[0] + 2; expect_px(sx << SH, (MY0 - 3) << SH, rgb(grey_at(sx, MY0 - 3), grey_at(sx, MY0 - 3), grey_at(sx, MY0 - 3)), "picture above the lanes"); end
                 expect_px(H_RES - 2, 2, s.lanes ? rgb(grey_at((H_RES - 2) >> SH, 1), grey_at((H_RES - 2) >> SH, 1), grey_at((H_RES - 2) >> SH, 1)) : rgb(255, 0, 0), "no-keys marker");
@@ -166,9 +258,17 @@ module game_video_overlay_tb;
             default: begin
                 logic [23:0] lc [4];
                 lc[0] = rgb(230, 60, 60); lc[1] = rgb(60, 200, 60); lc[2] = rgb(70, 110, 255); lc[3] = rgb(240, 220, 40);
-                for (int i = 0; i < 4; i++) expect_px((ll[i] + 3) << SH, sy << SH, s.lanes ? lc[i] : rgb(grey_at(ll[i] + 3, sy) >> 3, grey_at(ll[i] + 3, sy) >> 3, grey_at(ll[i] + 3, sy) >> 3), $sformatf("mask %0d", i));
-                expect_px(8 << SH, 30, rgb(128, 128, 128), "kept boundary in the mask view");
-                expect_px(28 << SH, 30, rgb(140, 0, 140), "dropped boundary in the mask view");
+                for (int i = 0; i < 4; i++) begin
+                    int c, mx [4][2];
+                    c = (ll[i] + lr[i]) / 2 + 1;                 // (one column off the centre: column 28 is a boundary line)
+                    mx[0] = '{ll[i] + 3, sy}; mx[1] = '{c, 39}; mx[2] = '{c, 44}; mx[3] = '{(i % 2 == 0) ? ll[i] + 1 : lr[i] - 1, 17};
+                    foreach (mx[k]) begin
+                        int gr; gr = grey_at(mx[k][0], mx[k][1]) >> 3;
+                        expect_px(mx[k][0] << SH, mx[k][1] << SH, in_key(s, i, mx[k][0], mx[k][1]) ? lc[i] : rgb(gr, gr, gr), $sformatf("mask %0d, probe %0d (age %0d)", i, k, s.age));
+                    end
+                end
+                expect_px(8 << SH, 90, rgb(128, 128, 128), "kept boundary in the mask view");          // row 45: the frame,
+                expect_px(28 << SH, 90, rgb(140, 0, 140), "dropped boundary in the mask view");        //  below every key
             end
         endcase
         if (s.view != 0) begin                            // readout: mode digit (0) at (6,6), dots of 2x2
@@ -193,6 +293,10 @@ module game_video_overlay_tb;
     task automatic mid_frame();  wait (y_pos == V_RES / 2); @(negedge clk); endtask
 
     initial begin
+        find_keys();
+        for (int i = 0; i < 4; i++) begin
+            if (!k_ok[i] || k_top[i] != 6 || k_bot[i] != 41) $fatal(1, "FAIL: bench key model, lane %0d: ok %0d top %0d bottom %0d", i, k_ok[i], k_top[i], k_bot[i]);
+        end
         reset_model();
         repeat (5) @(posedge clk); reset = 0;
         next_frame();                                           // frame 1: plain picture, no lanes
