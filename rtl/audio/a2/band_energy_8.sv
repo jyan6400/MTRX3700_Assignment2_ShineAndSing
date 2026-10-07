@@ -28,6 +28,25 @@
 // Clock/reset domain : FFT clock (18.432 MHz), synchronous active-high reset.
 // Reset clears the partial frame and the bin counter (frame re-alignment).
 // =============================================================================
+
+// =============================================================================
+// LIVE CHANGE -- R-A2 BAND BOUNDARIES
+// =============================================================================
+// BAND_EDGES in the parameter list is the direct live-change target.
+//
+// Band b owns:
+//     BAND_EDGES[b] <= k < BAND_EDGES[b+1]
+//
+// The lower edge is inclusive and the upper edge is exclusive. Moving one
+// internal edge transfers FFT bins between the two adjacent bands.
+//
+// The current defaults are eight equal 64-bin bands over bins 0..511.
+// If the FFT size or sample rate changes, recalculate the bin positions if
+// the intention is to preserve the same physical frequency boundaries.
+//
+// OUT_SHIFT changes only the scaling of the accumulated energies before the
+// 16-bit feature output; it does not move the frequency boundaries.
+// =============================================================================
 module band_energy_8 #(
     parameter int N            = 1024,
     parameter int MAG_W        = 33,

@@ -110,6 +110,45 @@ module game_video_overlay #(
     localparam int CMAX = (1 << GAME_COUNT_W) - 1;
     localparam int GH  = V_RES / 2;                     // profile graph height (screen rows)
 
+    // ==========================================================================
+    // LIVE-CHANGE CONFIGURATION -- VGA PRESENTATION
+    // --------------------------------------------------------------------------
+    // Keep presentation-only changes here.  These constants do NOT alter the
+    // detector, lane geometry, game FSM or CDC paths.
+    //
+    // SW2:SW1 view mapping.  To remap a switch value, change these IDs or the
+    // final case statement near "LIVE-CHANGE TARGET: VIEW MUX".
+    localparam logic [1:0] VIEW_GAME    = 2'd0;
+    localparam logic [1:0] VIEW_EDGE    = 2'd1;
+    localparam logic [1:0] VIEW_PROFILE = 2'd2;
+    localparam logic [1:0] VIEW_MASKS   = 2'd3;
+
+    // Game-view colours.  RGB is 8 bits/channel before conversion to VGA 10:10:10.
+    localparam logic [23:0] RGB_HIT_FLASH   = {8'd64,  8'd255, 8'd64};
+    localparam logic [23:0] RGB_HIT_WINDOW  = {8'd255, 8'd32,  8'd32};
+    localparam logic [23:0] RGB_LABEL       = {8'd0,   8'd0,   8'd0};
+    localparam logic [23:0] RGB_SCORE_BG    = {8'd16,  8'd16,  8'd16};
+    localparam logic [23:0] RGB_SCORE_FG    = {8'd255, 8'd220, 8'd40};
+    localparam logic [23:0] RGB_NO_LANES    = {8'd255, 8'd0,   8'd0};
+
+    // Profile/debug colours.
+    localparam logic [23:0] RGB_BOUND_KEEP  = {8'd0,   8'd200, 8'd0};
+    localparam logic [23:0] RGB_BOUND_DROP  = {8'd200, 8'd0,   8'd200};
+    localparam logic [23:0] RGB_PROFILE_BAR = {8'd255, 8'd208, 8'd32};
+    localparam logic [23:0] RGB_THRESH_LO   = {8'd255, 8'd140, 8'd0};
+    localparam logic [23:0] RGB_THRESH_HI   = {8'd255, 8'd32,  8'd32};
+    localparam logic [23:0] RGB_HUD_BG      = {8'd0,   8'd0,   8'd0};
+    localparam logic [23:0] RGB_HUD_FG      = {8'd255, 8'd255, 8'd255};
+
+    // Key-mask view lane colours -- the easiest Part-B colour-change targets.
+    localparam logic [23:0] RGB_MASK_LANE0  = {8'd230, 8'd60,  8'd60};
+    localparam logic [23:0] RGB_MASK_LANE1  = {8'd60,  8'd200, 8'd60};
+    localparam logic [23:0] RGB_MASK_LANE2  = {8'd70,  8'd110, 8'd255};
+    localparam logic [23:0] RGB_MASK_LANE3  = {8'd240, 8'd220, 8'd40};
+    localparam logic [23:0] RGB_MASK_KEEP   = {8'd128, 8'd128, 8'd128};
+    localparam logic [23:0] RGB_MASK_DROP   = {8'd140, 8'd0,   8'd140};
+    // ==========================================================================
+
     // ------------------------------------------------------------------ raster position
     logic [SXW-1:0] x, nx;
     logic [SYW-1:0] y, ny;
@@ -426,59 +465,115 @@ module game_video_overlay #(
     logic in_hud_box;
     assign in_hud_box = (int'(x) >= 2) && (int'(x) < 10 + 18 * LD) && (int'(y) >= 2) && (int'(y) < 10 + 5 * LD);
 
-    // ------------------------------------------------------------------ colour
+    // ==========================================================================
+    // LIVE-CHANGE TARGET: VIEW RENDERING / COLOURS
+    // --------------------------------------------------------------------------
+    // All four display modes are intentionally kept together here so a live
+    // change to a view or colour can be found from one heading.  The algorithmic
+    // state above is read-only from this point onward.
     function automatic logic [7:0] sat8(input int v);
         return (v > 255) ? 8'd255 : (v < 0) ? 8'd0 : 8'(v);
     endfunction
+
     logic [7:0] r, g, b;
     always_comb begin
+        // Default: untouched greyscale source picture.
         {r, g, b} = {grey, grey, grey};
+
+        // ======================================================================
+        // LIVE-CHANGE TARGET: VIEW MUX (SW2:SW1)
+        // ======================================================================
         case (f_view)
-            2'd0: begin                                               // ---- the game
+            VIEW_GAME: begin
+                // --------------------------------------------------------------
+                // LIVE-CHANGE TARGET: GAME VIEW
+                // --------------------------------------------------------------
                 for (int i = 0; i < 4; i++) if (in_lane[i]) begin
                     int lvl;
                     lvl = CMAX - int'(f_count[i]);
-                    if (f_flash[i] != '0)      begin r = grey >> 2; g = 8'd255; b = grey >> 2; end   // hit
-                    else if (f_window[i])      begin r = 8'd255; g = grey >> 3; b = grey >> 3; end   // sing now
-                    else if (f_active[i])      begin                                               // note counting down
-                        r = sat8(64 + (lvl * 180) / CMAX); g = sat8(40 + (lvl * 150) / CMAX); b = 8'd0;
-                    end else                   begin r = grey - (grey >> 3); g = grey - (grey >> 3); end // idle: faint blue
-                    if (label_dot[i]) begin r = 8'd0; g = 8'd0; b = 8'd0; end
+
+                    if (f_flash[i] != '0) begin
+                        // Keep the original behaviour: green channel fixed high,
+                        // red/blue retain one quarter of source brightness.
+                        r = grey >> 2;
+                        g = RGB_HIT_FLASH[15:8];
+                        b = grey >> 2;
+                    end else if (f_window[i]) begin
+                        // Hit window: red with a little source-dependent G/B.
+                        r = RGB_HIT_WINDOW[23:16];
+                        g = grey >> 3;
+                        b = grey >> 3;
+                    end else if (f_active[i]) begin
+                        // Countdown: amber gets brighter as count approaches zero.
+                        r = sat8(64 + (lvl * 180) / CMAX);
+                        g = sat8(40 + (lvl * 150) / CMAX);
+                        b = 8'd0;
+                    end else begin
+                        // Idle lane: retain the original faint blue tint by
+                        // reducing R/G while leaving B at source brightness.
+                        r = grey - (grey >> 3);
+                        g = grey - (grey >> 3);
+                    end
+
+                    if (label_dot[i]) {r, g, b} = RGB_LABEL;
                 end
-                if (!f_lanes_valid && (int'(x) >= H_RES - 24) && (int'(y) < 16)) begin r = 8'd255; g = 8'd0; b = 8'd0; end
+
+                if (!f_lanes_valid && (int'(x) >= H_RES - 24) && (int'(y) < 16))
+                    {r, g, b} = RGB_NO_LANES;
+
                 if (in_score_box) begin
-                    {r, g, b} = {8'd16, 8'd16, 8'd16};
-                    if (|score_dot) {r, g, b} = {8'd255, 8'd220, 8'd40};
+                    {r, g, b} = RGB_SCORE_BG;
+                    if (|score_dot) {r, g, b} = RGB_SCORE_FG;
                 end
             end
-            2'd1: begin                                               // ---- edge map
+
+            VIEW_EDGE: begin
+                // --------------------------------------------------------------
+                // LIVE-CHANGE TARGET: EDGE VIEW
+                // --------------------------------------------------------------
+                // 4-bit edge strength expanded to 8 bits for monochrome display.
                 {r, g, b} = {{edge4, edge4}, {edge4, edge4}, {edge4, edge4}};
             end
-            2'd2: begin                                               // ---- profile + thresholds
+
+            VIEW_PROFILE: begin
+                // --------------------------------------------------------------
+                // LIVE-CHANGE TARGET: PROFILE + THRESHOLD VIEW
+                // --------------------------------------------------------------
                 {r, g, b} = {grey >> 2, grey >> 2, grey >> 2};
                 if (on_bound) begin
-                    if (on_kept) {r, g, b} = {8'd0, 8'd200, 8'd0};
-                    else         {r, g, b} = {8'd200, 8'd0, 8'd200};
+                    if (on_kept) {r, g, b} = RGB_BOUND_KEEP;
+                    else         {r, g, b} = RGB_BOUND_DROP;
                 end
-                if (on_bar) {r, g, b} = {8'd255, 8'd208, 8'd32};
-                if (on_lo)  {r, g, b} = {8'd255, 8'd140, 8'd0};
-                if (on_hi)  {r, g, b} = {8'd255, 8'd32, 8'd32};
+                if (on_bar) {r, g, b} = RGB_PROFILE_BAR;
+                if (on_lo)  {r, g, b} = RGB_THRESH_LO;
+                if (on_hi)  {r, g, b} = RGB_THRESH_HI;
             end
-            default: begin                                            // ---- key masks
+
+            VIEW_MASKS: begin
+                // --------------------------------------------------------------
+                // LIVE-CHANGE TARGET: KEY-MASK VIEW / LANE COLOURS
+                // --------------------------------------------------------------
                 {r, g, b} = {grey >> 3, grey >> 3, grey >> 3};
                 if (on_bound) begin
-                    if (on_kept) {r, g, b} = {8'd128, 8'd128, 8'd128};
-                    else         {r, g, b} = {8'd140, 8'd0, 8'd140};
+                    if (on_kept) {r, g, b} = RGB_MASK_KEEP;
+                    else         {r, g, b} = RGB_MASK_DROP;
                 end
-                if (in_lane[0]) {r, g, b} = {8'd230, 8'd60,  8'd60};
-                if (in_lane[1]) {r, g, b} = {8'd60,  8'd200, 8'd60};
-                if (in_lane[2]) {r, g, b} = {8'd70,  8'd110, 8'd255};
-                if (in_lane[3]) {r, g, b} = {8'd240, 8'd220, 8'd40};
+                if (in_lane[0]) {r, g, b} = RGB_MASK_LANE0;
+                if (in_lane[1]) {r, g, b} = RGB_MASK_LANE1;
+                if (in_lane[2]) {r, g, b} = RGB_MASK_LANE2;
+                if (in_lane[3]) {r, g, b} = RGB_MASK_LANE3;
+            end
+
+            default: begin
+                // Defensive fallback if f_view is ever X/out of range in sim.
+                {r, g, b} = {grey, grey, grey};
             end
         endcase
-        if (f_view != 2'd0 && in_hud_box) begin
-            {r, g, b} = {8'd0, 8'd0, 8'd0};
-            if (|hud_dot) {r, g, b} = {8'd255, 8'd255, 8'd255};
+
+        // Common debug HUD for every non-game view.
+        if ((f_view != VIEW_GAME) && in_hud_box) begin
+            {r, g, b} = RGB_HUD_BG;
+            if (|hud_dot) {r, g, b} = RGB_HUD_FG;
         end
     end
 

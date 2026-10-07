@@ -7,6 +7,26 @@ module vowel_hit_mapper (
 
     import assignment2_pkg::*;
 
+
+    // ========================================================================
+    // LIVE CHANGE -- VOWEL -> LANE MAPPING
+    // ========================================================================
+    // Class IDs are defined in assignment2_pkg:
+    //   VOWEL_EE = ee ("see")
+    //   VOWEL_AH = ah ("car")
+    //   VOWEL_OO = oo ("boot")
+    //   VOWEL_AW = aw ("law")
+    //
+    // Current one-hot mapping:
+    //   ee -> lane 0 -> 0001
+    //   ah -> lane 1 -> 0010
+    //   oo -> lane 2 -> 0100
+    //   aw -> lane 3 -> 1000
+    //
+    // To change which lane a vowel controls, change only the corresponding
+    // one-hot value below. The classifier does not need to be retrained.
+    // ========================================================================
+
     always_comb begin
         vowel_lane_valid = 4'b0000;
 

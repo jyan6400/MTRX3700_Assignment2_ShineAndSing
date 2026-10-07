@@ -96,6 +96,7 @@ module video_subsystem #(
     parameter int    NMAX       = 32,      // most boundaries kept
     parameter int    NC         = 64,      // most candidate peaks (hysteresis_profile)
     parameter int    GAME_COUNT_W = assignment2_pkg::GAME_COUNT_W,
+    // LIVE-CHANGE TARGETS: geometry / rows / minimum key spacing
     parameter int    LANE_FIRST = 15,      // 15: the four middle keys found; 0..14: lane 0 is that white key
     parameter int    Y0         = 150,     // rows summed into the profile, and drawn as lanes
     parameter int    Y1         = 176,
@@ -103,6 +104,7 @@ module video_subsystem #(
     parameter int    GAP_RV4    = 8,       // min_gap at R-V4 and R-V1/R-V2
     parameter int    DB_TICKS   = 65536,   // key sampling period, clocks
     parameter int    GAP        = 2048,    // clocks between two sweeps of the picture
+    // LIVE-CHANGE TARGETS: board-adjustable threshold defaults
     parameter int    HI_DEF     = 115,     // threshold defaults (KEY3)
     parameter int    LO_DEF     = 64,
     parameter int    FLOOR_DEF  = 26,
@@ -146,6 +148,29 @@ module video_subsystem #(
     output logic                     lanes_valid
 );
     localparam int W = IMG_W, H = IMG_H, H_RES = VGA_W, V_RES = VGA_H;
+    // ==========================================================================
+    // LIVE-CHANGE CONFIGURATION -- VIDEO DETECTOR / BOARD CONTROLS
+    // --------------------------------------------------------------------------
+    // Mode IDs (SW7:SW6).  Naming these avoids hunting for raw 2'd0/1/2 values.
+    localparam logic [1:0] MODE_RV4 = 2'd0;
+    localparam logic [1:0] MODE_RV3 = 2'd1;
+    localparam logic [1:0] MODE_RV2 = 2'd2;
+    localparam logic [1:0] MODE_RV1 = 2'd3;
+
+    // KEY1/KEY2 adjustment step sizes.
+    localparam int KQ_STEP       = 8;
+    localparam int FLOOR_STEP    = 4;
+    localparam int HYST_STEP     = 8;
+    localparam int ABS_THR_STEP  = 256;
+
+    // R-V4 local threshold uses +/- this many profile columns around x.
+    localparam int LOCAL_WINDOW_HALF = 12;
+
+    // Sobel 1-2-1 smoothing gives approximately 4x the clean-edge response
+    // of the 1-D detector, so the common absolute threshold is shifted by 2.
+    localparam int SOBEL_THRESHOLD_SCALE_SHIFT = 2;
+    // ==========================================================================
+
     localparam int XW = $clog2(W);
     localparam int YW = $clog2(H);
     localparam int PW = $clog2(W*H);           // picture address
@@ -223,23 +248,23 @@ module video_subsystem #(
             hi <= NW'(HI_DEF); lo <= NW'(LO_DEF); floor_lvl <= NW'(FLOOR_DEF); k_q <= 8'(KQ_DEF); thr_abs <= AW'(ABS_DEF);
         end else if (press[1] || press[2]) begin
             case (mode_s)
-                2'd0: if (!sel_s) begin
-                          if (press[1]) k_q <= (k_q > 8'd247) ? 8'd255 : k_q + 8'd8;
-                          else          k_q <= (k_q < 8'd8)   ? 8'd0   : k_q - 8'd8;
+                MODE_RV4: if (!sel_s) begin
+                          if (press[1]) k_q <= (k_q > 8'(255-KQ_STEP)) ? 8'd255 : k_q + 8'(KQ_STEP);
+                          else          k_q <= (k_q < 8'(KQ_STEP))     ? 8'd0   : k_q - 8'(KQ_STEP);
                       end else begin
-                          if (press[1]) floor_lvl <= up(floor_lvl, 4);
-                          else          floor_lvl <= down(floor_lvl, 4);
+                          if (press[1]) floor_lvl <= up(floor_lvl, FLOOR_STEP);
+                          else          floor_lvl <= down(floor_lvl, FLOOR_STEP);
                       end
-                2'd1: if (!sel_s) begin
-                          if (press[1]) hi <= up(hi, 8);
-                          else          hi <= down(hi, 8);
+                MODE_RV3: if (!sel_s) begin
+                          if (press[1]) hi <= up(hi, HYST_STEP);
+                          else          hi <= down(hi, HYST_STEP);
                       end else begin
-                          if (press[1]) lo <= up(lo, 8);
-                          else          lo <= down(lo, 8);
+                          if (press[1]) lo <= up(lo, HYST_STEP);
+                          else          lo <= down(lo, HYST_STEP);
                       end
                 default: begin
-                          if (press[1]) thr_abs <= (thr_abs > {AW{1'b1}} - AW'(256)) ? {AW{1'b1}} : thr_abs + AW'(256);
-                          else          thr_abs <= (thr_abs < AW'(256)) ? '0 : thr_abs - AW'(256);
+                          if (press[1]) thr_abs <= (thr_abs > {AW{1'b1}} - AW'(ABS_THR_STEP)) ? {AW{1'b1}} : thr_abs + AW'(ABS_THR_STEP);
+                          else          thr_abs <= (thr_abs < AW'(ABS_THR_STEP)) ? '0 : thr_abs - AW'(ABS_THR_STEP);
                       end
             endcase
         end
@@ -253,10 +278,10 @@ module video_subsystem #(
 
     logic [1:0] cfg_mode;  logic cfg_edge;            // the setting of the sweep under way
     always_ff @(posedge clk_50)
-        if (reset_50) begin cfg_mode <= 2'd0; cfg_edge <= 1'b1; end
+        if (reset_50) begin cfg_mode <= MODE_RV4; cfg_edge <= 1'b1; end
         else if (frame_start) begin cfg_mode <= mode_s; cfg_edge <= edge_s; end
     logic smooth_on;
-    assign smooth_on = (cfg_mode == 2'd0);
+    assign smooth_on = (cfg_mode == MODE_RV4);
 
     // ------------------------------------------------------------------ R-V4 smoothing (conv3x3, 2nd table)
     logic g_valid; logic signed [12:0] g_val; logic [XW-1:0] g_x; logic [YW-1:0] g_y;
@@ -357,7 +382,7 @@ module video_subsystem #(
 
     // ------------------------------------------------------------------ R-V4: local threshold
     logic lt_start, lt_busy, lt_done; logic [XW-1:0] lt_src_x, lt_rd_x; logic [NW-1:0] lt_rd_val;
-    local_threshold #(.W(W), .NW(NW), .TW(NW), .HALF(12)) u_lthr (.clk(clk_50), .reset(reset_50), .start(lt_start), .k_q(r_kq),
+    local_threshold #(.W(W), .NW(NW), .TW(NW), .HALF(LOCAL_WINDOW_HALF)) u_lthr (.clk(clk_50), .reset(reset_50), .start(lt_start), .k_q(r_kq),
         .src_rd_x(lt_src_x), .src_rd_val(nz_rd_val), .busy(lt_busy), .done(lt_done),
         .rd_x(lt_rd_x), .rd_val(lt_rd_val));
 
@@ -367,7 +392,7 @@ module video_subsystem #(
     logic [IW-1:0] km_idx; logic [XW-1:0] hy_pos;
     logic hy_dwr; logic [XW-1:0] hy_dx; logic [NW-1:0] hy_dn, hy_dhi, hy_dlo;
     hysteresis_profile #(.W(W), .NW(NW), .NC(NC), .NMAX(NMAX)) u_hyst (.clk(clk_50), .reset(reset_50), .start(hy_start),
-        .adaptive(r_mode == 2'd0), .hi(r_hi), .lo(r_lo), .floor_lvl(r_floor), .min_gap(r_gap),
+        .adaptive(r_mode == MODE_RV4), .hi(r_hi), .lo(r_lo), .floor_lvl(r_floor), .min_gap(r_gap),
         .rd_x(hy_rd_x), .n_val(nz_rd_val), .t_val(lt_rd_val),
         .busy(hy_busy), .done(hy_done), .count(hy_count), .idx(km_idx), .pos_of(hy_pos), .cand_overflow(hy_ovf),
         .dsp_wr(hy_dwr), .dsp_x(hy_dx), .dsp_n(hy_dn), .dsp_hi(hy_dhi), .dsp_lo(hy_dlo));
@@ -415,8 +440,8 @@ module video_subsystem #(
                 r_mode <= cfg_mode; r_edge <= cfg_edge;
                 r_hi <= hi; r_lo <= lo; r_floor <= floor_lvl; r_kq <= k_q;
                 // Sobel's 1-2-1 weights give 4x the 1-D difference on a clean edge: one setting, both detectors
-                r_abs <= cfg_edge ? (thr_abs << 2) : thr_abs;
-                r_gap <= (cfg_mode == 2'd1) ? XW'(GAP_RV3) : XW'(GAP_RV4);
+                r_abs <= cfg_edge ? (thr_abs << SOBEL_THRESHOLD_SCALE_SHIFT) : thr_abs;
+                r_gap <= (cfg_mode == MODE_RV3) ? XW'(GAP_RV3) : XW'(GAP_RV4);
                 nz_start <= 1'b1;
                 ps <= P_NORM;
             end

@@ -32,6 +32,32 @@
 //                      the FFT domain; the top level crosses level_db to 50 MHz.
 //                      level[31:24] is the LEDR envelope bar source.
 // =============================================================================
+
+// =============================================================================
+// LIVE CHANGE -- VOICE GATE SENSITIVITY
+// =============================================================================
+// The main live-change knob is MARGIN_Q4 in the parameter list below.
+//
+// Gate condition implemented in this module:
+//     level * 16 > noise_floor * MARGIN_Q4
+//
+// MARGIN_Q4 is therefore a Q4 ratio:
+//     32  = 2.0 x noise floor
+//     64  = 4.0 x noise floor (current default)
+//     128 = 8.0 x noise floor
+//
+// Increase MARGIN_Q4:
+//   + stricter rejection of background noise
+//   - quieter/distant speech is less likely to open the gate
+//
+// Decrease MARGIN_Q4:
+//   + easier activation for quiet/distant speech
+//   - greater chance of noise opening the gate
+//
+// LEVEL_SHIFT and the FLOOR_*_SHIFT parameters control time constants rather
+// than the threshold ratio. Smaller shifts respond faster; larger shifts
+// respond more slowly.
+// =============================================================================
 module audio_gate #(
     parameter int SAMPLE_W              = 16,
     parameter int ENV_FRAC              = 16,     // fraction bits of level and floor

@@ -53,6 +53,78 @@ module top_level #(
 
     import assignment2_pkg::*;
 
+    // ============================================================
+    // PART B LIVE-CHANGE NAVIGATION INDEX
+    // ============================================================
+    //
+    // GAME
+    //   Beat period:
+    //     THIS FILE -> BEAT_MS
+    //     Larger BEAT_MS = slower countdown; smaller = faster.
+    //
+    //   Hit-window duration:
+    //     rtl/game/lane.sv -> HIT_WINDOW_TICKS
+    //
+    //   Vowel -> lane mapping:
+    //     rtl/game/vowel_hit_mapper.sv -> "LIVE CHANGE"
+    //
+    //   Correct-hit / early-press rules:
+    //     rtl/game/game_fsm.sv -> "LIVE CHANGE -- HIT RULE"
+    //
+    // AUDIO
+    //   Voice-gate sensitivity:
+    //     rtl/audio/a2/audio_gate.sv -> MARGIN_Q4
+    //
+    //   R-A2 band boundaries:
+    //     rtl/audio/a2/band_energy_8.sv -> BAND_EDGES
+    //
+    //   R-A4 Mel-band count / locations:
+    //     rtl/audio/a2/mel_filterbank_24.sv -> NM / MEL_PTS
+    //
+    //   Vote length / absolute reject / ambiguity reject:
+    //     rtl/audio/a2/audio_features.sv
+    //     -> "LIVE-CHANGE QUICK CONFIG -- AUDIO CLASSIFIER"
+    //
+    //   Actual nearest-template reject equation:
+    //     rtl/audio/provided_classifier/classifier.sv -> rej_c
+    //
+    // VIDEO
+    //   Detector rows, spacing, thresholds and R-V mode behaviour:
+    //     rtl/video/a2/video_subsystem.sv
+    //
+    //   VGA view mapping / colours / presentation:
+    //     rtl/video/a2/game_video_overlay.sv
+    //
+    //   Keyboard-lattice false-boundary rejection:
+    //     rtl/video/a2/key_mask_generator.sv -> "LIVE CHANGE -- KEYBOARD LATTICE"
+    //
+    //   R-V4 local adaptive threshold:
+    //     rtl/video/a2/local_threshold.sv -> HALF / k_q
+    //
+    //   R-V3/R-V4 hysteresis / NMS:
+    //     rtl/video/a2/hysteresis_profile.sv -> hi / lo / min_gap / adaptive
+    //
+    // BOARD CONTROLS (wired below into video_subsystem)
+    //   SW2:SW1 = VGA view
+    //   SW4:SW3 = source image
+    //   SW5     = 1-D difference / Sobel selector
+    //   SW7:SW6 = video rung/mode
+    //   SW0     = selects which threshold parameter KEY1/KEY2 adjust
+    //   KEY1/2  = threshold adjustment
+    //   KEY3    = threshold defaults restore
+    //   KEY0    = global reset
+    //
+    // HEX DEBUG
+    //   HEX5:HEX3 = FFT peak bin
+    //   HEX2      = accepted vowel class 0..3, blank when gate/reject says invalid
+    //   HEX1:HEX0 = microphone dB level
+    //
+    // Live-change rule of thumb:
+    //   First identify the owning module here, then edit the named parameter
+    //   or clearly marked LIVE CHANGE block rather than searching the datapath.
+    // ============================================================
+
+
 
     // ============================================================
     // Game configuration

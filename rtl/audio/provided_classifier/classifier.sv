@@ -79,6 +79,32 @@ module classifier #(
         for (int c = 1; c < NCLASS; c++) if (tally[c] > tally[winner]) winner = c;
     end
 
+
+    // ========================================================================
+    // LIVE CHANGE -- CLASSIFIER REJECTION RULE
+    // ========================================================================
+    // d1 = SAD distance to the nearest template.
+    // d2 = best SAD distance belonging to a DIFFERENT class.
+    //
+    // Reject when either:
+    //   1. d1 > DMAX
+    //      -> even the nearest template is too far from the feature vector.
+    //
+    //   2. d1 * RHO_DEN > d2 * RHO_NUM
+    //      -> d1/d2 > rho, so the winning class is too ambiguous relative
+    //         to the nearest competing class.
+    //
+    // DMAX controls absolute similarity.
+    // RHO_NUM/RHO_DEN controls relative class separation.
+    //
+    // Smaller rho = stricter ambiguity rejection (more rejects).
+    // Larger rho  = more permissive classification (fewer rejects).
+    //
+    // NOTE: classifier.sv has reusable defaults, but the integrated R-A4
+    // design passes its hardware values from audio_features.sv. Change the
+    // integrated setting there unless the live-change request specifically
+    // asks for this module's reusable default.
+    // ========================================================================
     logic rej_c;
     assign rej_c = (d1 > DMAX) || (d1 * RHO_DEN > d2 * RHO_NUM);
     logic [$clog2(M)-1:0] vidx;

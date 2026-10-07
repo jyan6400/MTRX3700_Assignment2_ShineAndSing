@@ -29,6 +29,34 @@
  *  seen with the 1-D detector at R-V3 on the noisy picture, which is expected to fail there anyway).
  *  The boundary list is read like peak_pick's: pos_of(idx), count.
  */
+
+// =============================================================================
+// LIVE CHANGE -- R-V3/R-V4 HYSTERESIS + PEAK SPACING
+// =============================================================================
+// Main inputs:
+//   adaptive = 0 : R-V3 uses constant hi / lo thresholds.
+//   adaptive = 1 : R-V4 derives hi(x)/lo(x) from local threshold t[x] and
+//                  floor_lvl.
+//
+// R-V3:
+//   hi = strong-response threshold.
+//   lo = weaker candidate/continuation threshold.
+//
+// Raising hi:
+//   requires a stronger peak to seed acceptance.
+//
+// Raising lo:
+//   removes more weak candidate peaks.
+//
+// Lowering either:
+//   makes detection more permissive but increases noise sensitivity.
+//
+// min_gap controls how close accepted peaks may be before they are treated as
+// the same boundary. Larger min_gap merges/rejects more nearby peaks; smaller
+// min_gap permits boundaries to be closer together.
+//
+// The board-adjustable defaults and mode selection live in video_subsystem.sv.
+// =============================================================================
 module hysteresis_profile #(
     parameter int W    = assignment2_pkg::IMG_W,
     parameter int NW   = 9,

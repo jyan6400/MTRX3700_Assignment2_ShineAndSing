@@ -36,6 +36,29 @@
 // accumulators + 24 x 52-bit output registers.
 // Clock/reset domain : FFT clock, synchronous active-high reset.
 // =============================================================================
+
+// =============================================================================
+// LIVE CHANGE -- R-A4 MEL FILTERBANK
+// =============================================================================
+// NM and MEL_PTS in the parameter list define the Mel representation.
+//
+// NM:
+//   number of triangular Mel filters / output energies.
+//
+// MEL_PTS:
+//   NM+2 FFT-bin points defining the left/centre/right edges of the triangles.
+//
+// Increasing NM gives finer spectral-envelope resolution but increases feature
+// dimension and classifier work. Decreasing NM gives a smaller, coarser vector.
+//
+// IMPORTANT: NM is NOT a safe isolated one-line change. If NM changes:
+//   1. regenerate a matching NM+2 MEL_PTS table,
+//   2. make audio_features.sv/classifier feature dimension D match,
+//   3. recapture/retrain the classifier templates.
+//
+// If FFT size or sample rate changes, MEL_PTS must also be regenerated if the
+// intended Mel frequencies are to stay the same.
+// =============================================================================
 module mel_filterbank_24 #(
     parameter int N            = 1024,
     parameter int MAG_W        = 33,

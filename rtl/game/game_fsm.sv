@@ -186,6 +186,25 @@ module game_fsm (
                 if (button_edge[i]) begin
 
 
+
+                    // ============================================
+                    // LIVE CHANGE -- HIT RULE
+                    // ============================================
+                    // A mapped vowel/button event scores only when:
+                    //   lane_active[i] == 1  AND  lane_zero[i] == 1.
+                    //
+                    // A correct hit asserts:
+                    //   valid_hit  -> score event,
+                    //   hit_pulse  -> one-shot visual feedback,
+                    //   lane_clear -> remove the note.
+                    //
+                    // An early event on an active non-zero lane clears the
+                    // note but deliberately gives no score.
+                    //
+                    // If the live-change request alters scoring conditions,
+                    // this is the owning decision block.
+                    // ============================================
+
                     // --------------------------------------------
                     // Correct hit
                     // --------------------------------------------

@@ -17,6 +17,29 @@
  *  Clock / reset: one clock (50 MHz analysis domain), synchronous active-high reset.
  *  `start` -> about W + HALF + 3 clocks -> `done`. Results: a W-entry RAM with a one-cycle read port.
  */
+
+// =============================================================================
+// LIVE CHANGE -- R-V4 LOCAL ADAPTIVE THRESHOLD
+// =============================================================================
+// HALF sets the neighbourhood radius. The full moving window is:
+//
+//     WIN = 2*HALF + 1
+//
+// With HALF=12, the default window is 25 profile columns.
+//
+// Larger HALF:
+//   + smoother, broader estimate of the local profile level
+//   - less responsive to a rapidly changing local illumination condition
+//
+// Smaller HALF:
+//   + more local adaptation
+//   - more sensitivity to local profile variation/noise
+//
+// k_q is supplied at run time by video_subsystem.sv and multiplies the local
+// running sum. Increasing k_q raises the adaptive threshold; decreasing it
+// lowers the threshold. The exact fixed-point relationship is documented in
+// the module header above.
+// =============================================================================
 module local_threshold #(
     parameter int W    = assignment2_pkg::IMG_W,
     parameter int NW   = 9,         // normalised profile width

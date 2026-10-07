@@ -100,6 +100,33 @@ module key_mask_generator #(
     logic [CW-1:0] need;
     assign need = ((n - CW'(2)) >> 1) + 1'b1;
 
+
+    // ========================================================================
+    // LIVE CHANGE -- KEYBOARD LATTICE FALSE-BOUNDARY REJECTION
+    // ========================================================================
+    // med is the estimated normal white-key spacing s (lower median gap).
+    // d   is the distance from the last kept boundary to the new candidate.
+    //
+    // Current normal-gap acceptance:
+    //     |d - s| < s/4
+    // i.e. approximately +/-25% spacing tolerance.
+    //
+    // Current missed-boundary allowance:
+    //     d > 1.5*s
+    // A large gap may mean an intermediate boundary was missed, so the next
+    // candidate is retained instead of being rejected as off-lattice.
+    //
+    // Tightening the s/4 tolerance:
+    //   + rejects more shadow/frame false boundaries
+    //   - tolerates less perspective or spacing distortion
+    //
+    // Loosening it:
+    //   + tolerates more distorted keyboard spacing
+    //   - permits more false candidates
+    //
+    // This stage REJECTS inconsistent candidates; it does not synthesize a
+    // missing boundary. kept_mask records the raw boundaries that survived.
+    // ========================================================================
     // FIT: distance from the last kept boundary
     logic [XW-1:0] d;
     logic [XW:0]   dev;                   // |d - s|

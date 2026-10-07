@@ -48,6 +48,24 @@
  * lane displays zero.
  */
 
+
+// =============================================================================
+// LIVE CHANGE -- HIT WINDOW
+// =============================================================================
+// HIT_WINDOW_TICKS below controls how many shared beat ticks a note remains
+// hittable while its countdown is zero.
+//
+// Increase HIT_WINDOW_TICKS:
+//   + more time for the player/audio classifier to produce the correct vowel
+//   - more forgiving timing
+//
+// Decrease HIT_WINDOW_TICKS:
+//   + tighter timing
+//   - less time for the classifier response
+//
+// This does NOT change the beat rate itself. The shared beat period is set by
+// BEAT_MS in top_level.sv.
+// =============================================================================
 module lane #(
     parameter int HIT_WINDOW_TICKS = 1
 ) (
