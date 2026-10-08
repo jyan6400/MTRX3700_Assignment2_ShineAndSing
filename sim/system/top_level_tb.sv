@@ -46,6 +46,8 @@ module top_level_tb;
 
     integer audio_frame_count;
     integer video_frame_count;
+    logic [1:0] target_lane;
+    logic [1:0] wrong_lane;
 
 
     // ============================================================
@@ -463,7 +465,7 @@ module top_level_tb;
     // Wait for lane 0 to become active.
     // ------------------------------------------------------------
 
-    task automatic wait_lane0_active;
+    task automatic wait_target_lane_active;
 
         int timeout;
 
@@ -472,7 +474,7 @@ module top_level_tb;
             timeout = 0;
 
             while (
-                !DUT.lane_active[0] &&
+                !DUT.lane_active[target_lane] &&
                 timeout < 20
             ) begin
 
@@ -487,7 +489,7 @@ module top_level_tb;
 
                 $fatal(
                     1,
-                    "Lane 0 did not become active"
+                    "Selected lane did not become active"
                 );
 
             end
@@ -505,7 +507,7 @@ module top_level_tb;
     // of lane state transitions.
     // ------------------------------------------------------------
 
-    task automatic advance_lane0_to_hit_window;
+    task automatic advance_target_lane_to_hit_window;
 
         int beats;
 
@@ -514,7 +516,7 @@ module top_level_tb;
             beats = 0;
 
             while (
-                !DUT.lane_zero[0] &&
+                !DUT.lane_zero[target_lane] &&
                 beats < 10
             ) begin
 
@@ -529,17 +531,17 @@ module top_level_tb;
 
                 $fatal(
                     1,
-                    "Lane 0 never reached its hit window"
+                    "Selected lane never reached its hit window"
                 );
 
             end
 
 
-            if (!DUT.lane_active[0]) begin
+            if (!DUT.lane_active[target_lane]) begin
 
                 $fatal(
                     1,
-                    "Lane 0 became inactive before hit window"
+                    "Selected lane became inactive before hit window"
                 );
 
             end
@@ -748,43 +750,61 @@ module top_level_tb;
 
         // --------------------------------------------------------
         // TEST 4:
-        // First beat spawns lane 0.
+        // First beat spawns exactly one randomly selected lane.
         // --------------------------------------------------------
 
         $display(
-            "TEST 4: deterministic lane spawn"
+            "TEST 4: pseudo-random lane spawn"
         );
 
+        // LIVE CHANGE -- RANDOM NOTE TEST
+        // Check that the integration exposes the two LFSR selector
+        // bits and that the selected lane is not permanently fixed.
+        // This test does NOT demand a particular pseudo-random order.
+        begin
+            logic [3:0] seen_lanes;
+            seen_lanes = 4'b0000;
 
-        pulse_beat();
+            repeat (32) begin
+                @(negedge CLOCK_50);
+                if (DUT.spawn_lane !== DUT.random_value[1:0]) begin
+                    $fatal(1, "RNG lane mapping does not match LFSR bits");
+                end
+                seen_lanes[DUT.spawn_lane] = 1'b1;
+            end
 
-        wait_lane0_active();
-
-
-        if (
-            DUT.lane_active[0] !==
-            1'b1
-        ) begin
-
-            $fatal(
-                1,
-                "Expected lane 0 to spawn first"
-            );
-
+            if (seen_lanes !== 4'b1111) begin
+                $fatal(1, "RNG did not visit all four lanes: %b", seen_lanes);
+            end
         end
 
+        // The RNG is free-running, so capture its lane selection
+        // immediately before the forced beat clock edge.
+        @(negedge CLOCK_50);
+        force DUT.beat_tick = 1'b1;
+        target_lane = DUT.spawn_lane;
+        wrong_lane  = target_lane ^ 2'd1;
+        @(posedge CLOCK_50);
+        #1;
+        release DUT.beat_tick;
+        @(posedge CLOCK_50);
+        #1;
 
-        $display(
-            "  PASS: lane 0 spawned"
-        );
+        if (!$onehot(DUT.lane_active) ||
+            DUT.lane_active[target_lane] !== 1'b1) begin
+            $fatal(1, "RNG spawn failed: lane=%0d active=%b",
+                   target_lane, DUT.lane_active);
+        end
+
+        $display("  PASS: RNG selected lane %0d", target_lane);
 
 
         // --------------------------------------------------------
         // TEST 5:
         // Correct vowel too early must NOT score.
         //
-        // lane 0 has just spawned and therefore should not yet be
-        // in its hit window.
+        // The selected lane has just spawned and should not yet
+        // be in its hit window.
         // --------------------------------------------------------
 
         $display(
@@ -792,19 +812,19 @@ module top_level_tb;
         );
 
 
-        if (DUT.lane_zero[0]) begin
+        if (DUT.lane_zero[target_lane]) begin
 
             $fatal(
                 1,
-                "Lane 0 unexpectedly already in hit window"
+                "Selected lane unexpectedly already in hit window"
             );
 
         end
 
 
-        inject_audio_vowel(2'd0);
+        inject_audio_vowel(target_lane);
 
-        expect_game_vowel(2'd0);
+        expect_game_vowel(target_lane);
 
         wait_sys_cycles(5);
 
@@ -829,7 +849,7 @@ module top_level_tb;
 
         // --------------------------------------------------------
         // TEST 6:
-        // Advance lane 0 until it reaches the hit window.
+        // Advance the selected lane until it reaches the hit window.
         // --------------------------------------------------------
 
         $display(
@@ -837,23 +857,23 @@ module top_level_tb;
         );
 
 
-        advance_lane0_to_hit_window();
+        advance_target_lane_to_hit_window();
 
 
         if (
-            !DUT.lane_zero[0]
+            !DUT.lane_zero[target_lane]
         ) begin
 
             $fatal(
                 1,
-                "Lane 0 was not in hit window"
+                "Selected lane was not in hit window"
             );
 
         end
 
 
         $display(
-            "  PASS: lane 0 reached hit window"
+            "  PASS: target lane reached hit window"
         );
 
 
@@ -861,7 +881,7 @@ module top_level_tb;
         // TEST 7:
         // Wrong vowel must not score.
         //
-        // Use aw/lane 3 while lane 0 is the target.
+        // Use a different vowel/lane from the selected target.
         // --------------------------------------------------------
 
         $display(
@@ -869,9 +889,9 @@ module top_level_tb;
         );
 
 
-        inject_audio_vowel(2'd3);
+        inject_audio_vowel(wrong_lane);
 
-        expect_game_vowel(2'd3);
+        expect_game_vowel(wrong_lane);
 
         wait_sys_cycles(5);
 
@@ -890,12 +910,12 @@ module top_level_tb;
 
 
         if (
-            !DUT.lane_active[0]
+            !DUT.lane_active[target_lane]
         ) begin
 
             $fatal(
                 1,
-                "Wrong vowel unexpectedly cleared lane 0"
+                "Wrong vowel unexpectedly cleared target lane"
             );
 
         end
@@ -908,7 +928,7 @@ module top_level_tb;
 
         // --------------------------------------------------------
         // TEST 8:
-        // Correct ee event while lane 0 is in its hit window.
+        // Correct vowel event while target lane is in its hit window.
         // --------------------------------------------------------
 
         $display(
@@ -916,9 +936,9 @@ module top_level_tb;
         );
 
 
-        inject_audio_vowel(2'd0);
+        inject_audio_vowel(target_lane);
 
-        expect_game_vowel(2'd0);
+        expect_game_vowel(target_lane);
 
         wait_for_score(16'd1);
 
@@ -1042,6 +1062,24 @@ module top_level_tb;
         $display(
             "  PASS: reset propagated through game/video path"
         );
+
+        // --------------------------------------------------------
+        // TEST 12: RNG output spans all four possible lane IDs.
+        // This is a source-level integration sanity check; the
+        // standalone rng_tb additionally checks the LFSR sequence.
+        // --------------------------------------------------------
+        $display("TEST 12: RNG drives all four lane IDs");
+        begin
+            logic [3:0] seen;
+            seen = 4'b0000;
+            repeat (32) begin
+                @(negedge CLOCK_50);
+                seen[DUT.spawn_lane] = 1'b1;
+            end
+            if (seen !== 4'b1111)
+                $fatal(1, "RNG lane coverage incomplete: %b", seen);
+        end
+        $display("  PASS: all four RNG lane IDs observed");
 
 
         // ========================================================

@@ -6,7 +6,7 @@
 # Runs top_level_tb using Verilator 5.050.
 # Covers:
 #   - reset
-#   - deterministic lane spawning
+#   - pseudo-random lane spawning
 #   - early/wrong/correct vowel handling
 #   - no duplicate scoring
 #   - audio -> game CDC
@@ -32,6 +32,11 @@ rm -rf "$BUILD"
 mkdir -p "$BUILD"
 
 echo
+echo "Checking the reused Assignment 1 RNG first..."
+bash "$ROOT/sim/system/run_rng_tests.sh"
+
+echo
+
 echo "Building top_level_tb..."
 
 "$VERILATOR" \
@@ -53,6 +58,7 @@ echo "Building top_level_tb..."
   "$ROOT/rtl/game/lane.sv" \
   "$ROOT/rtl/game/score.sv" \
   "$ROOT/rtl/game/timer.v" \
+  "$ROOT/rtl/game/rng.v" \
   "$ROOT/rtl/audio/lesson3_reuse/mic_load.sv" \
   "$ROOT/rtl/audio/pitch_reuse/low_pass_conv.sv" \
   "$ROOT/rtl/audio/pitch_reuse/decimate.sv" \

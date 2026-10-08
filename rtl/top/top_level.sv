@@ -62,6 +62,14 @@ module top_level #(
     //     THIS FILE -> BEAT_MS
     //     Larger BEAT_MS = slower countdown; smaller = faster.
     //
+    //   Random note selection:
+    //     THIS FILE -> NOTE SCHEDULER (u_rng / spawn_lane)
+    //
+    //   Random note selection (A1 LFSR reuse):
+    //     THIS FILE -> "LIVE CHANGE -- RANDOM NOTE GENERATION"
+    //     rtl/game/rng.v -> "LIVE CHANGE -- RANDOM NOTE GENERATION"
+    //     Each beat attempts one randomly selected lane.
+    //
     //   Hit-window duration:
     //     rtl/game/lane.sv -> HIT_WINDOW_TICKS
     //
@@ -466,34 +474,47 @@ module top_level #(
 
 
     // ============================================================
-    // NOTE SCHEDULER
+    // LIVE CHANGE -- RANDOM NOTE GENERATION (ASSIGNMENT 1 REUSE)
+    // ============================================================
+    // WHAT CHANGED FROM THE ORIGINAL ASSIGNMENT 2 SCHEDULER?
+    //   Before: spawn_lane incremented 0 -> 1 -> 2 -> 3 each beat.
+    //   Now:    use the low two bits of the Assignment 1 10-bit LFSR.
     //
-    // First integration implementation:
+    // WHAT STAYS THE SAME?
+    //   - One spawn ATTEMPT per beat (spawn_valid = beat_tick).
+    //   - The game FSM ignores attempts to spawn into an active lane.
+    //   - NOTE_START remains fixed so hit windows remain beat-aligned.
+    //   - Lane 0/1/2/3 still map to ee/ah/oo/aw, respectively.
+    //   - The audio classifier, scoring and video paths are untouched.
     //
-    //      lane 0 -> lane 1 -> lane 2 -> lane 3 -> repeat
+    // ASSIGNMENT 1 COMPATIBILITY
+    //   rng.v is the same free-running 10-bit LFSR algorithm as A1.
+    //   A1 also randomized countdowns; A2 intentionally keeps the
+    //   existing fixed countdown to preserve its hit-window rules.
     //
-    // Keeping this deterministic makes board integration much
-    // easier. The scheduler can later be replaced without changing
-    // the game, CDC or video interfaces.
+    // IMPORTANT TIMING DETAIL
+    //   The LFSR updates each CLOCK_50 edge, but the game FSM samples
+    //   spawn_lane on the edge when beat_tick is asserted. A stable
+    //   pre-edge random_value therefore selects that beat's lane.
     // ============================================================
 
+    logic [9:0] random_value;
     logic [1:0] spawn_lane;
     logic       spawn_valid;
 
+    rng #(
+        .OFFSET    (0),
+        .MAX_VALUE (1024),
+        .SEED      (10'b0000000001)
+    ) u_rng (
+        .clk          (CLOCK_50),
+        .random_value (random_value)
+    );
 
-    always_ff @(posedge CLOCK_50) begin
+    // Two bits encode the four game lanes without modulo arithmetic.
+    assign spawn_lane = random_value[1:0];
 
-        if (reset_50) begin
-            spawn_lane <= 2'd0;
-        end
-
-        else if (beat_tick) begin
-            spawn_lane <= spawn_lane + 2'd1;
-        end
-
-    end
-
-
+    // As in A1, an occupied random lane produces a skipped spawn.
     assign spawn_valid = beat_tick;
 
 

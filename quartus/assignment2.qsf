@@ -749,6 +749,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/lesson3_reuse/i2c_ma
 set_global_assignment -name VERILOG_FILE ../rtl/audio/lesson3_reuse/adc_pll.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/game/vowel_hit_mapper.sv
 set_global_assignment -name VERILOG_FILE ../rtl/game/timer.v
+set_global_assignment -name VERILOG_FILE ../rtl/game/rng.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/game/score.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/game/lane.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/game/game_fsm.sv
