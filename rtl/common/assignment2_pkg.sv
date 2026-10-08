@@ -6,7 +6,7 @@ package assignment2_pkg;
     localparam int unsigned FFT_CLK_HZ    = 18_432_000;
     localparam int unsigned PIXEL_CLK_HZ  = 25_000_000;
 
-    // Audio sampling / FFT
+    // Audio sampling, LIVE CHANGE / FFT
     localparam int unsigned AUDIO_SAMPLE_W = 16;
     localparam int unsigned AUDIO_FS_IN    = 48_000;
     localparam int unsigned AUDIO_FS_FFT   = 12_000;
