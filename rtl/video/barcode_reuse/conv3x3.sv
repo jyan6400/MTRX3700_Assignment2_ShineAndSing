@@ -28,6 +28,7 @@
  *  result fits in 12 bits signed (Sobel: +-4*255 = +-1020). The smoothing table sums to 16, so
  *  its instance uses OW = 13 (16*255 = 4080).
  */
+// LIVE CHANGE 3X3
 module conv3x3 #(
     parameter int W  = 320,
     parameter int H  = 240,
