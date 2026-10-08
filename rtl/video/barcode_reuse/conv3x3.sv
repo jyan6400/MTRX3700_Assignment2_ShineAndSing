@@ -115,6 +115,7 @@ module conv3x3 #(
             end
         end
     end
+    // LIVE CHANGE (Out_x, out_y)
     always_ff @(posedge clk) begin
         // The window holds three real rows and three real columns once s2_x >= 2 and s2_y >= 2.
         out_valid <= s2_valid && (s2_x >= 2) && (s2_y >= 2);
