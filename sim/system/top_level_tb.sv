@@ -178,6 +178,43 @@ module top_level_tb;
 
 
     // ============================================================
+    // ROM content and image selection: known-independent HEX samples.
+    // The address is (x=100, y=160): 160*320+100=51300.
+    // Expected 8-bit pixels come from memory/piano{0,1,2}.hex.
+    // Run only in simulation; synthesised RTL is untouched.
+    // ============================================================
+    task automatic verify_selected_picture(
+        input logic [1:0] picture_id,
+        input logic [7:0] expected_grey
+    );
+        integer cycles;
+        bit seen;
+        SW[4:3] = picture_id;
+        // Allow the two-stage asynchronous-switch synchroniser to settle.
+        repeat (12) @(negedge CLOCK_50);
+        if (DUT.u_video.img50 !== picture_id)
+            $fatal(1, "ROM selector mismatch: requested %0d, got %0d",
+                   picture_id, DUT.u_video.img50);
+        seen = 0;
+        // Analyse port A continuously raster-scans the 320x240 image.
+        for (cycles = 0; cycles < 170_000 && !seen; cycles++) begin
+            @(negedge CLOCK_50);
+            if (DUT.u_video.ra_addr == 17'd51300) begin
+                @(posedge CLOCK_50);
+                #1; // ROM q_a is registered on this clock edge.
+                if (DUT.u_video.ra_q !== expected_grey)
+                    $fatal(1, "ROM image %0d at (100,160): got %02h, expected %02h",
+                           picture_id, DUT.u_video.ra_q, expected_grey);
+                seen = 1;
+            end
+        end
+        if (!seen)
+            $fatal(1, "ROM image %0d: raster never requested pixel (100,160)", picture_id);
+        $display("  PASS: piano%0d selected, pixel (100,160) = 0x%02h",
+                 picture_id, expected_grey);
+    endtask
+
+    // ============================================================
     // Utility tasks
     // ============================================================
 
@@ -747,6 +784,17 @@ module top_level_tb;
             video_frame_count
         );
 
+
+        // --------------------------------------------------------
+        // TEST 3B: verify all three picture ROMs with independent
+        //          expected pixels and the actual SW[4:3] mux.
+        // --------------------------------------------------------
+        $display("TEST 3B: picture ROM content and selection (3 images)");
+        verify_selected_picture(2'd0, 8'hC0); // piano0.hex, address 51300
+        verify_selected_picture(2'd1, 8'hFF); // piano1.hex, address 51300
+        verify_selected_picture(2'd2, 8'h51); // piano2.hex, address 51300
+        SW[4:3] = 2'd0; // restore default image
+        wait_sys_cycles(12);
 
         // --------------------------------------------------------
         // TEST 4:

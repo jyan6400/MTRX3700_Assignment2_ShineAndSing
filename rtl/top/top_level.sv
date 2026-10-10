@@ -192,7 +192,14 @@ module top_level #(
     assign fft_clk    = fft_clk_sim;
     assign fft_locked = 1'b1;
 
-    assign i2c_clk    = 1'b0;
+`ifdef SYSTEM_CODEC_TEST
+    // Simulated 100 kHz I2C controller clock; hardware synthesis is unchanged.
+    logic i2c_clk_sim = 1'b0;
+    always #5000 i2c_clk_sim = ~i2c_clk_sim;
+    assign i2c_clk = i2c_clk_sim;
+`else
+    assign i2c_clk = 1'b0;
+`endif
     assign i2c_locked = 1'b1;
 
 `else
@@ -233,20 +240,23 @@ module top_level #(
     // WM8731 configuration
     // ============================================================
 
-`ifndef VERILATOR
-
+`ifdef VERILATOR
+`ifdef SYSTEM_CODEC_TEST
     set_audio_encoder u_audio_config (
         .i2c_clk  (i2c_clk),
         .I2C_SCLK (FPGA_I2C_SCLK),
         .I2C_SDAT (FPGA_I2C_SDAT)
     );
-
 `else
-
-    // The system simulation does not need to exercise the external
-    // I2C configuration transaction.
     assign FPGA_I2C_SCLK = 1'b1;
     assign FPGA_I2C_SDAT = 1'bz;
+`endif
+`else
+    set_audio_encoder u_audio_config (
+        .i2c_clk  (i2c_clk),
+        .I2C_SCLK (FPGA_I2C_SCLK),
+        .I2C_SDAT (FPGA_I2C_SDAT)
+    );
 
 `endif
 
