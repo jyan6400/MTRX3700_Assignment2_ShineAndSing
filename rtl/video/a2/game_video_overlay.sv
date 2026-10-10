@@ -207,6 +207,9 @@ module game_video_overlay #(
     logic                  f_edge;
     logic [3:0]            f_active, f_window;
     logic [GAME_COUNT_W-1:0] f_count [0:3];
+    // Precompute countdown colours once per frame, not once per pixel.
+    // This moves the multiply/divide logic before the frame registers.
+    logic [7:0] f_amber_r [0:3], f_amber_g [0:3];
     logic [19:0]           f_bcd;
     logic [3:0]            hit_seen;
     logic [$clog2(FLASH_FRAMES+1)-1:0] f_flash [0:3];
@@ -215,7 +218,7 @@ module game_video_overlay #(
         if (reset) begin
             f_view <= '0; f_lanes_valid <= 1'b0; f_bcount <= '0; f_kept <= '0; f_mode <= '0; f_edge <= 1'b1;
             f_active <= '0; f_window <= '0; f_bcd <= '0; hit_seen <= '0;
-            for (int i = 0; i < 4; i++) begin f_l[i] <= '0; f_r[i] <= '0; f_count[i] <= '0; f_flash[i] <= '0; end
+            for (int i = 0; i < 4; i++) begin f_l[i] <= '0; f_r[i] <= '0; f_count[i] <= '0; f_amber_r[i] <= 8'd0; f_amber_g[i] <= 8'd0; f_flash[i] <= '0; end
             for (int i = 0; i < NMAX; i++) f_b[i] <= '0;
         end else begin
             hit_seen <= frame_latch ? 4'b0 : (hit_seen | lane_hit_pulse);
@@ -227,6 +230,10 @@ module game_video_overlay #(
                     f_l[i]     <= res_lane_l[i*XW +: XW];
                     f_r[i]     <= res_lane_r[i*XW +: XW];
                     f_count[i] <= lane_count[i];
+                    // Same integer expression as the original pixel combinational logic.
+                    // Values are in range 64..244 (R), 40..190 (G): no saturation needed.
+                    f_amber_r[i] <= 8'(64 + ((CMAX - int'(lane_count[i])) * 180) / CMAX);
+                    f_amber_g[i] <= 8'(40 + ((CMAX - int'(lane_count[i])) * 150) / CMAX);
                     if (hit_seen[i] || lane_hit_pulse[i]) f_flash[i] <= ($clog2(FLASH_FRAMES+1))'(FLASH_FRAMES);
                     else if (f_flash[i] != '0)           f_flash[i] <= f_flash[i] - 1'b1;
                 end
@@ -489,9 +496,6 @@ module game_video_overlay #(
                 // LIVE-CHANGE TARGET: GAME VIEW
                 // --------------------------------------------------------------
                 for (int i = 0; i < 4; i++) if (in_lane[i]) begin
-                    int lvl;
-                    lvl = CMAX - int'(f_count[i]);
-
                     if (f_flash[i] != '0) begin
                         // Keep the original behaviour: green channel fixed high,
                         // red/blue retain one quarter of source brightness.
@@ -505,8 +509,8 @@ module game_video_overlay #(
                         b = grey >> 3;
                     end else if (f_active[i]) begin
                         // Countdown: amber gets brighter as count approaches zero.
-                        r = sat8(64 + (lvl * 180) / CMAX);
-                        g = sat8(40 + (lvl * 150) / CMAX);
+                        r = f_amber_r[i];
+                        g = f_amber_g[i];
                         b = 8'd0;
                     end else begin
                         // Idle lane: retain the original faint blue tint by
